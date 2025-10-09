@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 let cached = global.mongoose || { conn: null, promise: null };
 
 async function connectDB() {
+  console.log("🔍 MONGODB_URI =", process.env.MONGODB_URI ? "✅ Loaded" : "❌ Missing");
+  console.log("🔍 MONGODB_URI =", process.env.MONGODB_URI );
+
   if (cached.conn) {
     console.log("🟢 [DB] Using existing MongoDB connection");
     return cached.conn;
