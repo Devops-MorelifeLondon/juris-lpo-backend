@@ -23,7 +23,7 @@ const caseSchema = new mongoose.Schema({
   paralegal: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Paralegal',
-    required: true
+    required: false
   },
   client: {
     name: String,

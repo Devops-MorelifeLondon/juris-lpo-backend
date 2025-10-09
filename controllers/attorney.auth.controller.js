@@ -35,7 +35,7 @@ const sendTokenResponse = (attorney, statusCode, res) => {
     token,
     data: {
       id: attorney._id,
-      firstName: attorney.fullName,
+      fullName: attorney.fullName,
       email: attorney.email,
       isVerified: attorney.isVerified,
       profileCompleted: attorney.profileCompleted,
