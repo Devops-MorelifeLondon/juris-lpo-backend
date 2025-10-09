@@ -7,9 +7,7 @@
       "dest": "server.js"
     }
   ],
-  "env": {
-    "MONGODB_URI": "@MONGODB_URI"
-  },
+ 
   "functions": {
     "api/**/*.js": {
       "maxDuration": 10
