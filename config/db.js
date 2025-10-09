@@ -1,44 +1,31 @@
 // config/db.js
 const mongoose = require('mongoose');
 
-let cached = global.mongoose || { conn: null, promise: null };
+let isConnected = false; // Track connection status
 
-async function connectDB() {
-  console.log("🔍 MONGODB_URI =", process.env.MONGODB_URI ? "✅ Loaded" : "❌ Missing");
-  console.log("🔍 MONGODB_URI =", process.env.MONGODB_URI );
+const connectDB = async () => {
+  // Set strict query mode
+  mongoose.set('strictQuery', true);
 
-  if (cached.conn) {
-    console.log("🟢 [DB] Using existing MongoDB connection");
-    return cached.conn;
-  }
-
-  if (!cached.promise) {
-    console.log("🟡 [DB] Creating new MongoDB connection...");
-
-    cached.promise = mongoose
-      .connect(process.env.MONGODB_URI, {
-        dbName: "jurisLPO",
-        bufferCommands: false,
-      })
-      .then((mongooseInstance) => {
-        console.log("✅ [DB] MongoDB connected successfully:", mongooseInstance.connection.host);
-        return mongooseInstance;
-      })
-      .catch((err) => {
-        console.error("❌ [DB] MongoDB connection error:", err.message);
-        throw err;
-      });
+  if (isConnected) {
+    console.log('✅ Using existing MongoDB connection');
+    return;
   }
 
   try {
-    cached.conn = await cached.promise;
-  } catch (err) {
-    console.error("🚨 [DB] Connection failed:", err);
-    throw err;
-  }
+    const db = await mongoose.connect(process.env.MONGODB_URI, {
+      dbName: 'jurisLPO',
+      maxPoolSize: 10, // Connection pool size
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      socketTimeoutMS: 45000,
+    });
 
-  global.mongoose = cached;
-  return cached.conn;
-}
+    isConnected = db.connections[0].readyState === 1;
+    console.log('✅ MongoDB connected successfully');
+  } catch (err) {
+    console.error('❌ MongoDB connection error:', err.message);
+    throw err; // Don't exit process in serverless
+  }
+};
 
 module.exports = connectDB;

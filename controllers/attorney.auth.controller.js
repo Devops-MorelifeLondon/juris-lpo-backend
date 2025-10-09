@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const {  sendBrevoEmailApi } = require('../lib/emailBrevoSdk');
 const emailTemplates = require('../lib/emailTemplates');
+const connectDB = require('../config/db');
 
 
 
@@ -48,6 +49,7 @@ const sendTokenResponse = (attorney, statusCode, res) => {
 // @access  Public
 exports.register = async (req, res) => {
   try {
+     await connectDB();
     const { fullName, email, password } = req.body;
     console.log("📥 [Register] Received data:", req.body);
 
@@ -124,6 +126,7 @@ const { OAuth2Client } = require("google-auth-library");
 // Google login controller
 exports.googlelogin = async (req, res) => {
   try {
+    await connectDB();
     const { credential } = req.body; // JWT token from Google frontend
     if (!credential) {
       return res.status(400).json({
@@ -198,6 +201,7 @@ exports.googlelogin = async (req, res) => {
 // @access  Public
 exports.login = async (req, res) => {
   try {
+     await connectDB();
     const { email, password } = req.body;
 
     // Validate email & password

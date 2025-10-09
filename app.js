@@ -9,7 +9,7 @@ const notFound = require('./middleware/notFound');
 
 
 const app = express();
-app.use(errorHandler);
+app.set('trust proxy', 1);
 
 // ✅ 1. Enable CORS FIRST (before anything else)
 app.use(corsConfig);
@@ -39,5 +39,6 @@ app.use('/api/attorney/auth', require('./routes/attorney.auth.routes'));
 // ✅ 7. 404 + error handlers
 app.use(notFound);
 app.use(errorHandler);
+
 
 module.exports = app;

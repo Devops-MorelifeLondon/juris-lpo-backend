@@ -29,7 +29,7 @@ const { authLimiter, passwordResetLimiter } = require('../middleware/rateLimiter
 // Public routes with rate limiting
 router.post('/register', register);
 router.post('/google-login', googlelogin);
-router.post('/login', authLimiter, validateLogin, login);
+router.post('/login', login);
 router.get('/verify-email/:token', verifyEmail);
 router.post('/forgot-password', passwordResetLimiter, validateEmail, forgotPassword);
 router.put('/reset-password/:token', resetPassword);
