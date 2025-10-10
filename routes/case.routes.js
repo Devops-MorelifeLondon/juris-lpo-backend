@@ -13,96 +13,68 @@ const {
     getCaseStats
 } = require('../controllers/case.auth.controller');
 
-
-
-
-
 const { apiLimiter } = require('../middleware/rateLimiter');
 const { protect } = require('../middleware/auth');
 
-// Apply rate limiting to all case routes
+// Apply rate limiting and authentication to all routes
 router.use(apiLimiter);
-
-// Public routes - None (all case routes require authentication)
+router.use(protect);
 
 // ========================================
 // ATTORNEY & PARALEGAL SHARED ROUTES
 // ========================================
-
-// @route   GET /api/cases/my-cases
-// @desc    Get all cases for logged-in user (filtered by role)
-// @access  Private (Attorney/Paralegal)
-router.get('/my-cases',protect, getMyCases);
 
 // @route   GET /api/cases/stats
 // @desc    Get case statistics for logged-in user
 // @access  Private (Attorney/Paralegal)
 router.get('/stats', getCaseStats);
 
+// @route   GET /api/cases/my-cases
+// @desc    Get all cases for logged-in user (filtered by role)
+// @access  Private (Attorney/Paralegal)
+router.get('/my-cases', getMyCases);
+
 // @route   GET /api/cases/:caseId
 // @desc    Get single case by ID
 // @access  Private (Attorney/Paralegal - must be assigned)
 router.get('/:caseId', getCaseById);
 
-// @route   PUT /api/cases/:caseId/status
-// @desc    Update case status
+// @route   PATCH /api/cases/:caseId/status
+// @desc    Update case status (partial update)
 // @access  Private (Attorney/Paralegal)
-router.put(
-    '/:caseId/status',
-    updateCaseStatus
-);
+router.patch('/:caseId/status', updateCaseStatus);
 
 // ========================================
 // ATTORNEY ONLY ROUTES
 // ========================================
 
-// @route   POST /api/cases/create
-// @desc    Create new case and assign to paralegal
+// @route   POST /api/cases
+// @desc    Create new case
 // @access  Private (Attorney only)
-router.post(
-    '/create',
-    protect,
-    createCase
-);
+router.post('/', createCase);
 
-// @route   PUT /api/cases/:caseId/update
-// @desc    Update case details
+// @route   PUT /api/cases/:caseId
+// @desc    Update case details (full or partial update)
 // @access  Private (Attorney only)
-router.put(
-    '/:caseId/update',
+router.put('/:caseId', updateCase);
 
-    updateCase
-);
-
-// @route   PUT /api/cases/:caseId/archive
-// @desc    Archive case
+// @route   PATCH /api/cases/:caseId/archive
+// @desc    Archive case (partial update)
 // @access  Private (Attorney only)
-router.put(
-    '/:caseId/archive',
-
-    archiveCase
-);
+router.patch('/:caseId/archive', archiveCase);
 
 // @route   DELETE /api/cases/:caseId
 // @desc    Delete case (soft delete)
 // @access  Private (Attorney only)
-router.delete(
-    '/:caseId',
-
-    deleteCase
-);
+router.delete('/:caseId', deleteCase);
 
 // ========================================
 // PARALEGAL ONLY ROUTES
 // ========================================
 
-// @route   PUT /api/cases/:caseId/hours
-// @desc    Update case hours and cost
+// @route   PATCH /api/cases/:caseId/hours
+// @desc    Update case hours and cost (partial update)
 // @access  Private (Paralegal only)
-router.put(
-    '/:caseId/hours',
-
-    updateCaseHours
-);
+router.patch('/:caseId/hours', updateCaseHours);
 
 module.exports = router;

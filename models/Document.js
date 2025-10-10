@@ -12,11 +12,7 @@ const documentSchema = new mongoose.Schema({
     ref: 'Case',
     required: true
   },
-  uploadedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-    refPath: 'uploaderModel'
-  },
+
   uploaderModel: {
     type: String,
     required: true,

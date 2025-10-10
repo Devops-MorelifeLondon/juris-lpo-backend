@@ -11,9 +11,9 @@ const caseSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  description: {
+  notes: {
     type: String,
-    required: true
+    required: false
   },
   attorney: {
     type: mongoose.Schema.Types.ObjectId,
@@ -47,7 +47,7 @@ const caseSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Pending', 'Accepted', 'Declined', 'In Progress', 'Review', 'Completed', 'Cancelled'],
+    enum: ['New','Pending', 'Accepted', 'Declined', 'In Progress', 'Review', 'Completed', 'Cancelled'],
     default: 'Pending'
   },
   priority: {
@@ -83,7 +83,6 @@ const caseSchema = new mongoose.Schema({
     hearingDate: Date,
     judge: String
   },
-  notes: String,
   assignmentDetails: {
     requestedAt: {
       type: Date,

@@ -17,7 +17,9 @@ exports.protect = async (req, res, next) => {
     }
 
     // Verify token
+    console.log("TOKEN : ", token);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("DECODE : ", decoded);
    
 
     // Fetch user from DB
