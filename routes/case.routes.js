@@ -17,7 +17,7 @@ const { apiLimiter } = require('../middleware/rateLimiter');
 const { protect } = require('../middleware/auth');
 
 // Apply rate limiting and authentication to all routes
-router.use(apiLimiter);
+// router.use(apiLimiter);
 router.use(protect);
 
 // ========================================

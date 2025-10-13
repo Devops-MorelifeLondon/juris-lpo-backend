@@ -1,10 +1,10 @@
-// models/Task.js
 const mongoose = require('mongoose');
 
 const taskSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   description: {
     type: String,
@@ -13,7 +13,7 @@ const taskSchema = new mongoose.Schema({
   case: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Case',
-    required: true
+    required: false // Made optional
   },
   assignedBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -23,7 +23,11 @@ const taskSchema = new mongoose.Schema({
   assignedTo: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Paralegal',
-    required: true
+    required: false // Made optional
+  },
+  demoAssignedTo: {
+    type: String,
+    required: false
   },
   type: {
     type: String,
@@ -46,13 +50,20 @@ const taskSchema = new mongoose.Schema({
   },
   startDate: Date,
   completedDate: Date,
-  estimatedHours: Number,
+  estimatedHours: {
+    type: Number,
+    min: 0
+  },
   actualHoursSpent: {
     type: Number,
-    default: 0
+    default: 0,
+    min: 0
   },
   checklistItems: [{
-    text: String,
+    text: {
+      type: String,
+      required: true
+    },
     completed: {
       type: Boolean,
       default: false
@@ -62,18 +73,22 @@ const taskSchema = new mongoose.Schema({
   attachments: [{
     name: String,
     url: String,
+    size: Number,
     uploadedAt: {
       type: Date,
       default: Date.now
     }
   }],
-  notes: String
+  notes: String,
+  tags: [String]
 }, {
   timestamps: true
 });
 
-// Indexes
-taskSchema.index({ case: 1, status: 1 });
+// Indexes for performance
+taskSchema.index({ assignedBy: 1, status: 1 });
 taskSchema.index({ assignedTo: 1, dueDate: 1 });
+taskSchema.index({ case: 1, status: 1 });
+taskSchema.index({ dueDate: 1 });
 
 module.exports = mongoose.model('Task', taskSchema);
