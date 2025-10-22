@@ -19,6 +19,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
+app.get('/', async (req,res)=>{
+  res.status(200).json({
+    message: "server working fine"
+  })
+})
+
 
 
 // ✅ 4. Rate limiting AFTER CORS + before routes
