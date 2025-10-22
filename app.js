@@ -37,6 +37,7 @@ app.get('/health', (req, res) => {
 app.use('/api/attorney/auth', require('./routes/attorney.auth.routes'));
 app.use('/api/cases', require('./routes/case.routes'));
 app.use('/api/tasks', require('./routes/taskRoutes'));
+app.use('/api/paralegals', require('./routes/paralegal.auth.routes'));
 
 // ✅ 7. 404 + error handlers
 app.use(notFound);

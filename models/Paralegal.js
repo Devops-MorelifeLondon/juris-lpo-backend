@@ -22,23 +22,23 @@ const paralegalSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
+    required: [false, 'Password is required'],
     minlength: 8,
     select: false
   },
   phone: {
     type: String,
-    required: true
+    required: false
   },
   avatar: String,
   headline: {
     type: String,
-    required: true,
+    required: false,
     maxlength: 100
   },
   about: {
     type: String,
-    required: true,
+    required: false,
     maxlength: 1000
   },
   specializations: [{
@@ -74,7 +74,7 @@ const paralegalSchema = new mongoose.Schema({
   }],
   hourlyRate: {
     type: Number,
-    required: true,
+    required: false,
     min: 0
   },
   availability: {
@@ -88,7 +88,7 @@ const paralegalSchema = new mongoose.Schema({
       day: String,
       startTime: String,
       endTime: String,
-      available: { type: Boolean, default: true }
+      available: { type: Boolean, default: false }
     }]
   },
   maxActiveCases: {
