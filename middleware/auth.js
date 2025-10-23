@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const Attorney = require('../models/Attorney');
+const Paralegal = require("../models/Paralegal");
 
 exports.protect = async (req, res, next) => {
   try {
@@ -12,6 +13,8 @@ exports.protect = async (req, res, next) => {
       token = req.headers.authorization.split(" ")[1];
     }
 
+    console.log("Token :", req.headers.authorization)
+
 
     if (!token) {
       return res.status(401).json({ success: false, message: "No token provided" });
@@ -21,7 +24,7 @@ exports.protect = async (req, res, next) => {
 
 
     let user;
-    if(decode.role == 'attorney'){
+    if(decoded.role == 'attorney'){
        user = await Attorney.findById(decoded.id).select("fullName email");
     }else{
        user = await Paralegal.findById(decoded.id).select("fullName email");
