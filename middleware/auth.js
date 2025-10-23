@@ -11,21 +11,24 @@ exports.protect = async (req, res, next) => {
     ) {
       token = req.headers.authorization.split(" ")[1];
     }
-    console.log(token);
+
 
     if (!token) {
       return res.status(401).json({ success: false, message: "No token provided" });
     }
 
-    // Verify token
-    console.log("TOKEN : ", token);
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("DECODE : ", decoded);
+
+
+    let user;
+    if(decode.role == 'attorney'){
+       user = await Attorney.findById(decoded.id).select("fullName email");
+    }else{
+       user = await Paralegal.findById(decoded.id).select("fullName email");
+    }
    
 
-    // Fetch user from DB
-    const user = await Attorney.findById(decoded.id).select("fullName email");
-    console.log(user);
+    
     if (!user) {
       return res.status(401).json({ success: false, message: "User not found" });
     }

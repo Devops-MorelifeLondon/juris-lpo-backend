@@ -9,6 +9,7 @@ const { protect } = require('../middleware/paralegalauth');
 router.post('/', paralegalController.createParalegal);
 router.post('/login', paralegalController.loginParalegal);
 router.post('/auth/google-login', paralegalController.googlelogin);
+router.get('/', paralegalController.getAllParalegals);
 router.use(protect);
 router.get('/singleparalegal', paralegalController.getParalegalById);
 router.route('/availableStatus')
@@ -19,7 +20,6 @@ router.route('/availableStatus')
 router.put('/singleparalegal', paralegalController.updateParalegal);
 
 // GET /api/paralegals - Get all paralegals
-router.get('/', paralegalController.getAllParalegals);
 
 // GET /api/paralegals/:id - Get a single paralegal by ID
 

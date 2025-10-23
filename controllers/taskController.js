@@ -16,6 +16,7 @@ exports.getTasks = async (req, res) => {
     if (priority) query.priority = priority;
     if (assignedTo) query.assignedTo = assignedTo;
     if (type) query.type = type;
+    query.assignedTo = req.user._id;
 
     // Search in title and description
     if (search) {
@@ -26,12 +27,7 @@ exports.getTasks = async (req, res) => {
       ];
     }
 
-    // Filter based on user role
-    if (req.user.role === 'attorney') {
-      query.assignedBy = req.user._id;
-    } else if (req.user.role === 'paralegal') {
-      query.assignedTo = req.user._id;
-    }
+  
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const total = await Task.countDocuments(query);
@@ -39,7 +35,7 @@ exports.getTasks = async (req, res) => {
     const tasks = await Task.find(query)
       .populate('case', 'name caseNumber serviceType status')
       .populate('assignedBy', 'fullName email')
-      .populate('assignedTo', 'fullName email')
+      .populate('assignedTo', 'firstName lastName email')
       .sort({ dueDate: 1, priority: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -123,6 +119,8 @@ exports.createTask = async (req, res) => {
       tags
     } = req.body;
 
+    console.log(assignedTo);
+
     // Validate required fields
     if (!title || !description || !type || !dueDate) {
       return res.status(400).json({
@@ -156,7 +154,7 @@ exports.createTask = async (req, res) => {
       description,
       case: caseId || undefined,
       assignedBy: req.user._id,
-      demoAssignedTo: assignedTo || undefined, // Stores full name as string
+      assignedTo: assignedTo || undefined, // Stores full name as string
       type,
       priority: priority || 'Medium',
       dueDate: new Date(dueDate), // Parse string to Date
