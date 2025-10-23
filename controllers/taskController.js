@@ -16,7 +16,11 @@ exports.getTasks = async (req, res) => {
     if (priority) query.priority = priority;
     if (assignedTo) query.assignedTo = assignedTo;
     if (type) query.type = type;
-    query.assignedTo = req.user._id;
+    if(req.user.role == "paralegal"){
+      query.assignedTo = req.user._id;
+    }else{
+      query.assignedBy = req.user._id;
+    }
 
     // Search in title and description
     if (search) {
