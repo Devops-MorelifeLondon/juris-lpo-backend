@@ -112,8 +112,6 @@ exports.createTask = async (req, res) => {
     const {
       title,
       description,
-      case: caseId,
-      assignedTo,
       type,
       priority,
       dueDate,
@@ -123,7 +121,7 @@ exports.createTask = async (req, res) => {
       tags
     } = req.body;
 
-    console.log(assignedTo);
+
 
     // Validate required fields
     if (!title || !description || !type || !dueDate) {
@@ -133,32 +131,13 @@ exports.createTask = async (req, res) => {
       });
     }
 
-    // If case is provided, verify it exists and user has access
-    if (caseId) {
-      const caseExists = await Case.findById(caseId);
-      if (!caseExists) {
-        return res.status(404).json({
-          success: false,
-          message: 'Case not found'
-        });
-      }
-
-      // Check if user has access to the case
-      if (req.user.role === 'attorney' && caseExists.attorney.toString() !== req.user._id.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: 'You do not have access to this case'
-        });
-      }
-    }
+ 
 
     // Create task with parsed fields
     const task = await Task.create({
       title,
       description,
-      case: caseId || undefined,
       assignedBy: req.user._id,
-      assignedTo: assignedTo || undefined, // Stores full name as string
       type,
       priority: priority || 'Medium',
       dueDate: new Date(dueDate), // Parse string to Date

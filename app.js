@@ -9,10 +9,10 @@ const notFound = require('./middleware/notFound');
 
 
 const app = express();
+app.use(corsConfig);
 app.set('trust proxy', 1);
 
 // ✅ 1. Enable CORS FIRST (before anything else)
-app.use(corsConfig);
 
 // ✅ 2. Body + Cookie parser
 app.use(express.json({ limit: '10mb' }));

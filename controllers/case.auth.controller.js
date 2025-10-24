@@ -27,6 +27,7 @@ exports.createCase = async (req, res) => {
       name,
       client,
       serviceType,
+      otherServiceTypeDescription, // Added this line
       status,
       priority,
       deadline,
@@ -34,7 +35,7 @@ exports.createCase = async (req, res) => {
       agreedHourlyRate,
       actualHoursSpent,
       totalCost,
-      notes
+      notes,
     } = req.body;
 
     console.log("📦 Request Body:", req.body);
@@ -43,7 +44,20 @@ exports.createCase = async (req, res) => {
     if (!name || !serviceType || !caseNumber || !client?.name) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: caseNumber, name, client.name, serviceType'
+        message:
+          "Missing required fields: caseNumber, name, client.name, serviceType",
+      });
+    }
+
+    // ✅ Conditionally validate otherServiceTypeDescription
+    if (
+      serviceType === "Other" &&
+      (!otherServiceTypeDescription ||
+        otherServiceTypeDescription.trim() === "")
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Description for 'Other' service type is required.",
       });
     }
 
@@ -51,12 +65,12 @@ exports.createCase = async (req, res) => {
     if (!req.user || !req.user.id) {
       return res.status(401).json({
         success: false,
-        message: 'Unauthorized. Attorney information missing.'
+        message: "Unauthorized. Attorney information missing.",
       });
     }
 
-    // ✅ Create case document
-    const newCase = await Case.create({
+    // ✅ Create case data object
+    const newCaseData = {
       caseNumber,
       name,
       notes: notes || "",
@@ -65,60 +79,67 @@ exports.createCase = async (req, res) => {
         name: client.name,
         email: client.email || "",
         phone: client.phone || "",
-        address: client.address || ""
+        address: client.address || "",
       },
       serviceType,
-      status: status || 'New',
-      priority: priority || 'Medium',
+      status: status || "New",
+      priority: priority || "Medium",
       deadline: deadline || null,
       budget: Number(budget) || 0,
       agreedHourlyRate: Number(agreedHourlyRate) || 0,
       actualHoursSpent: Number(actualHoursSpent) || 0,
       totalCost: Number(totalCost) || 0,
       assignmentDetails: {
-        requestedAt: Date.now()
-      }
-    });
+        requestedAt: Date.now(),
+      },
+    };
+
+    // ✅ Add otherServiceTypeDescription if serviceType is 'Other'
+    if (serviceType === "Other") {
+      newCaseData.otherServiceTypeDescription = otherServiceTypeDescription;
+    }
+    
+    const newCase = await Case.create(newCaseData);
 
     // ✅ Populate attorney details before sending response
     const populatedCase = await Case.findById(newCase._id)
-      .populate('attorney', 'fullName email firmName')
-      .populate('paralegal', 'fullName email');
+      .populate("attorney", "fullName email firmName")
+      .populate("paralegal", "fullName email");
 
     res.status(201).json({
       success: true,
-      message: 'Case created successfully',
-      data: populatedCase
+      message: "Case created successfully",
+      data: populatedCase,
     });
-
   } catch (error) {
-    console.error('💥 Create case error:', error);
+    console.error("💥 Create case error:", error);
 
-    if (error.name === 'ValidationError') {
+    if (error.name === "ValidationError") {
       return res.status(400).json({
         success: false,
-        message: 'Validation failed',
-        errors: Object.values(error.errors).map(err => ({
+        message: "Validation failed",
+        errors: Object.values(error.errors).map((err) => ({
           field: err.path,
-          message: err.message
-        }))
+          message: err.message,
+        })),
       });
     }
 
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        message: 'Case number already exists'
+        message: "Case number already exists",
       });
     }
 
     res.status(500).json({
       success: false,
-      message: 'Server error during case creation',
-      error: error.message
+      message: "Server error during case creation",
+      error: error.message,
     });
   }
 };
+
 
 // @desc    Get all cases for logged-in user (based on role)
 // @route   GET /api/cases/my-cases

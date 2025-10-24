@@ -42,8 +42,12 @@ const caseSchema = new mongoose.Schema({
     enum: [
       'Family Law', 'Personal Injury', 'Real Estate', 'Estate Planning',
       'Intellectual Property', 'Business Law', 'Immigration Services',
-      'Bankruptcy', 'Criminal Law', 'Tax Law', 'Employment Law'
+      'Bankruptcy', 'Criminal Law', 'Tax Law', 'Employment Law', 'Other'
     ]
+  },
+  otherServiceTypeDescription : {
+    type: String,
+    required: false
   },
   status: {
     type: String,
@@ -57,7 +61,7 @@ const caseSchema = new mongoose.Schema({
   },
   deadline: {
     type: Date,
-    required: true
+    required: false
   },
   budget: {
     type: Number,
@@ -65,7 +69,7 @@ const caseSchema = new mongoose.Schema({
   },
   agreedHourlyRate: {
     type: Number,
-    required: true
+    required: false
   },
   estimatedHours: Number,
   actualHoursSpent: {

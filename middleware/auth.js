@@ -6,15 +6,19 @@ exports.protect = async (req, res, next) => {
   try {
     let token;
 
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith("Bearer")
-    ) {
+
+
+     // 1. Check Authorization header first
+    if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
       token = req.headers.authorization.split(" ")[1];
     }
 
-    console.log("Token :", req.headers.authorization)
-
+    // 2. If no token in header, check cookies
+    if (!token && req.cookies?.token) {
+      token = req.cookies.token;
+    }
+console.log("Token : ", token);
+ 
 
     if (!token) {
       return res.status(401).json({ success: false, message: "No token provided" });
