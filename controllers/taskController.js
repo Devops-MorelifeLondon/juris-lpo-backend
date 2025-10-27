@@ -1,6 +1,9 @@
 const Task = require('../models/Task');
 const Case = require('../models/Case');
 const Paralegal = require('../models/Paralegal');
+const { attorneyTaskCreatedTemplate, paralegalTaskAvailableTemplate } = require('../lib/emailTemplates');
+const { sendBrevoEmailApi } = require('../lib/emailBrevoSdk');
+const Notification = require('../models/Notification');
 
 // @desc    Get all tasks with filters
 // @route   GET /api/tasks
@@ -121,8 +124,6 @@ exports.createTask = async (req, res) => {
       tags
     } = req.body;
 
-
-
     // Validate required fields
     if (!title || !description || !type || !dueDate) {
       return res.status(400).json({
@@ -131,33 +132,163 @@ exports.createTask = async (req, res) => {
       });
     }
 
- 
-
-    // Create task with parsed fields
+    // Create task
     const task = await Task.create({
       title,
       description,
       assignedBy: req.user._id,
       type,
       priority: priority || 'Medium',
-      dueDate: new Date(dueDate), // Parse string to Date
+      dueDate: new Date(dueDate),
       estimatedHours: estimatedHours ? Number(estimatedHours) : undefined,
       checklistItems: checklistItems || [],
       notes,
       tags: tags || []
     });
 
-    // Populate and return (note: demoAssignedTo is not populated, display directly)
+    // Populate task details
     const populatedTask = await Task.findById(task._id)
       .populate('case', 'name caseNumber')
       .populate('assignedBy', 'fullName email')
-      .populate('assignedTo', 'fullName email'); // This will be null for demo
+      .populate('assignedTo', 'firstName lastName email');
+
+    console.log('✅ Task created:', task._id);
+
+    // === NOTIFICATION SYSTEM ===
+
+    // 1. Send confirmation email to attorney
+    try {
+      const attorneyEmailData = {
+        _id: task._id,
+        title,
+        type,
+        priority: priority || 'Medium',
+        dueDate,
+        estimatedHours
+      };
+
+      const attorneyFullName = `${req.user.fullName}`;
+      
+      await sendBrevoEmailApi({
+        to_email: [{ email: req.user.email, name: attorneyFullName }],
+        email_subject: '✅ Task Created Successfully - Juris-LPO',
+        htmlContent: attorneyTaskCreatedTemplate(attorneyFullName, attorneyEmailData)
+      });
+
+      console.log('📧 Attorney confirmation email sent to:', req.user.email);
+
+    } catch (emailError) {
+      console.error('❌ Failed to send attorney email:', emailError.message);
+      // Don't fail the whole operation if email fails
+    }
+
+    // 2. Create in-app notification for attorney
+    try {
+      await Notification.create({
+        recipient: req.user._id,
+        recipientModel: 'Attorney',
+        type: 'task_created',
+        task: task._id,
+        message: `Your task "${title}" has been created and broadcasted to all paralegals.`
+      });
+      console.log('🔔 Attorney notification created');
+    } catch (notifError) {
+      console.error('❌ Failed to create attorney notification:', notifError.message);
+    }
+
+    // 3. Fetch all verified and active paralegals
+    const allParalegals = await Paralegal.find({ 
+    }).select('_id firstName lastName email');
+
+    console.log(`📊 Found ${allParalegals.length} available paralegals`);
+
+    if (allParalegals.length === 0) {
+      console.log('⚠️ No available paralegals found');
+      return res.status(201).json({
+        success: true,
+        message: 'Task created successfully, but no paralegals are currently available',
+        data: populatedTask,
+        notificationsSent: 0
+      });
+    }
+
+    // 4. Create in-app notifications for all paralegals
+    try {
+      const paralegalNotifications = allParalegals.map(paralegal => ({
+        recipient: paralegal._id,
+        recipientModel: 'Paralegal',
+        type: 'task_created',
+        task: task._id,
+        message: `New task available: "${title}" - ${priority || 'Medium'} priority, due ${new Date(dueDate).toLocaleDateString('en-IN')}`
+      }));
+
+      await Notification.insertMany(paralegalNotifications);
+      console.log(`🔔 Created ${paralegalNotifications.length} paralegal notifications`);
+    } catch (notifError) {
+      console.error('❌ Failed to create paralegal notifications:', notifError.message);
+    }
+
+    // 5. Send emails to all paralegals
+    const paralegalEmailData = {
+      _id: task._id,
+      title,
+      description,
+      type,
+      priority: priority || 'Medium',
+      dueDate,
+      estimatedHours,
+      assignedByName: `${req.user.fullName}`
+    };
+
+    let emailsSentCount = 0;
+    let emailsFailedCount = 0;
+
+    // Send emails in batches to avoid overwhelming the API
+    const batchSize = 50; // Brevo typically allows batch sending
+    
+    for (let i = 0; i < allParalegals.length; i += batchSize) {
+      const batch = allParalegals.slice(i, i + batchSize);
+      
+      // Prepare recipient list for this batch
+      const recipients = batch.map(p => ({
+        email: p.email,
+        name: `${p.firstName} ${p.lastName}`
+      })).filter(d => d.email != 'ritz@jurislpo.com');
+      console.log(recipients);
+
+      // Send to each paralegal individually for personalization
+      const emailPromises = recipients.map(async (recipient) => {
+        try {
+          await sendBrevoEmailApi({
+            to_email: [recipient],
+            email_subject: '🔔 New Task Available - Juris-LPO',
+            htmlContent: paralegalTaskAvailableTemplate(recipient.name, paralegalEmailData)
+          });
+          emailsSentCount++;
+          console.log(`✅ Email sent to: ${recipient.email}`);
+        } catch (error) {
+          emailsFailedCount++;
+          console.error(`❌ Failed to send email to ${recipient.email}:`, error.message);
+        }
+      });
+
+      // Wait for this batch to complete before moving to next
+      await Promise.allSettled(emailPromises);
+    }
+
+    console.log(`📧 Email Summary - Sent: ${emailsSentCount}, Failed: ${emailsFailedCount}`);
 
     res.status(201).json({
       success: true,
-      message: 'Task created successfully',
-      data: populatedTask
+      message: `Task created successfully and broadcasted to ${allParalegals.length} paralegals`,
+      data: populatedTask,
+      notifications: {
+        total: allParalegals.length,
+        emailsSent: emailsSentCount,
+        emailsFailed: emailsFailedCount
+      }
     });
+
   } catch (error) {
     console.error('❌ Create task error:', error);
     res.status(500).json({
@@ -419,6 +550,175 @@ exports.getTaskStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch statistics',
+      error: error.message
+    });
+  }
+};
+
+
+
+// controllers/taskController.js
+
+exports.acceptTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    
+    // Find task
+    const task = await Task.findById(taskId).populate('assignedBy', 'firstName lastName email');
+    
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        message: 'Task not found'
+      });
+    }
+
+    // Check if already assigned (FCFS logic)
+    if (task.assignedTo) {
+      return res.status(400).json({
+        success: false,
+        message: 'This task has already been accepted by another paralegal',
+        alreadyAssigned: true
+      });
+    }
+
+    // Check if task is still available
+    if (task.status === 'Completed' || task.status === 'Cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: `This task has been ${task.status.toLowerCase()}`
+      });
+    }
+
+    // Assign task to current paralegal
+    task.assignedTo = req.user._id;
+    task.status = 'In Progress';
+    task.startDate = new Date();
+    await task.save();
+
+    // Update paralegal's active cases count
+    await Paralegal.findByIdAndUpdate(req.user._id, {
+      $inc: { currentActiveCases: 1 }
+    });
+
+    console.log(`✅ Task ${taskId} accepted by paralegal ${req.user._id}`);
+
+    // Create notification for attorney
+    try {
+      await Notification.create({
+        recipient: task.assignedBy._id,
+        recipientModel: 'Attorney',
+        type: 'task_accepted',
+        task: task._id,
+        message: `Task "${task.title}" has been accepted by ${req.user.firstName} ${req.user.lastName}`
+      });
+      console.log('🔔 Attorney notification created for task acceptance');
+    } catch (notifError) {
+      console.error('❌ Failed to create attorney notification:', notifError.message);
+    }
+
+    // Send email to attorney
+    try {
+      const attorneyFullName = `${task.assignedBy.firstName} ${task.assignedBy.lastName}`;
+      const paralegalFullName = `${req.user.firstName} ${req.user.lastName}`;
+
+      const attorneyNotificationHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"><title>Task Accepted</title></head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6; padding: 40px 20px; margin: 0;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+          <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 32px 24px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="color: #ffffff; font-size: 28px; margin: 0;">✅ Task Accepted</h1>
+          </div>
+          <div style="padding: 32px 24px;">
+            <p style="font-size: 15px; color: #374151; line-height: 1.6;">Dear ${attorneyFullName},</p>
+            <p style="font-size: 15px; color: #374151; line-height: 1.6;">Good news! Your task <strong>"${task.title}"</strong> has been accepted by <strong>${paralegalFullName}</strong>.</p>
+            <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 16px; margin: 24px 0; border-radius: 4px;">
+              <p style="margin: 0; color: #166534; font-size: 14px;">The paralegal will begin working on this task shortly. You can track progress in your dashboard.</p>
+            </div>
+            <div style="margin: 32px 0; text-align: center;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/attorney/tasks/${task._id}" style="background-color: #2563eb; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">View Task Details</a>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>`;
+
+      await sendBrevoEmailApi({
+        to_email: [{ 
+          email: task.assignedBy.email, 
+          name: attorneyFullName 
+        }],
+        email_subject: '✅ Task Accepted - Juris-LPO',
+        htmlContent: attorneyNotificationHtml
+      });
+
+      console.log('📧 Attorney notification email sent');
+    } catch (emailError) {
+      console.error('❌ Failed to send attorney notification email:', emailError.message);
+    }
+
+    // Populate and return updated task
+    const updatedTask = await Task.findById(task._id)
+      .populate('case', 'name caseNumber')
+      .populate('assignedBy', 'firstName lastName email')
+      .populate('assignedTo', 'firstName lastName email');
+
+    res.status(200).json({
+      success: true,
+      message: 'Task accepted successfully',
+      data: updatedTask
+    });
+
+  } catch (error) {
+    console.error('❌ Accept task error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to accept task',
+      error: error.message
+    });
+  }
+};
+
+// Get available tasks for paralegals
+exports.getAvailableTasks = async (req, res) => {
+  try {
+    const { type, priority, page = 1, limit = 20 } = req.query;
+
+    const query = {
+      assignedTo: null, // Only unassigned tasks
+      status: 'Not Started',
+      dueDate: { $gte: new Date() } // Only future tasks
+    };
+
+    if (type) query.type = type;
+    if (priority) query.priority = priority;
+
+    const tasks = await Task.find(query)
+      .populate('assignedBy', 'firstName lastName email')
+      .populate('case', 'name caseNumber')
+      .sort({ priority: -1, createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Task.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: tasks,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / limit),
+        totalTasks: total,
+        tasksPerPage: tasks.length
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get available tasks error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch available tasks',
       error: error.message
     });
   }

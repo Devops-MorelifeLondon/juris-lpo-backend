@@ -17,7 +17,6 @@ exports.protect = async (req, res, next) => {
     if (!token && req.cookies?.token) {
       token = req.cookies.token;
     }
-console.log("Token : ", token);
  
 
     if (!token) {
@@ -31,7 +30,7 @@ console.log("Token : ", token);
     if(decoded.role == 'attorney'){
        user = await Attorney.findById(decoded.id).select("fullName email");
     }else{
-       user = await Paralegal.findById(decoded.id).select("fullName email");
+       user = await Paralegal.findById(decoded.id).select("firstName lastName email");
     }
    
 
