@@ -368,7 +368,7 @@ exports.acceptTask = async (req, res) => {
         recipientModel: 'Attorney',
         type: 'task_assigned',
         task: task._id,
-        message: `Excellent! Paralegal ${paralegal.firstName} ${paralegal.lastName} has accepted your ${task.domain} task: "${task.title}"`,
+        message: `Excellent! Paralegal ${paralegal.firstName} ${paralegal.lastName} has accepted your task: "${task.title}"`,
         metadata: {
           paralegalId: paralegalId.toString(),
           paralegalName: `${paralegal.firstName} ${paralegal.lastName}`,
@@ -384,7 +384,7 @@ exports.acceptTask = async (req, res) => {
         recipientModel: 'Paralegal',
         type: 'task_accepted',
         task: task._id,
-        message: `Congratulations! You have accepted a new ${task.domain} task: "${task.title}" (Priority: ${task.priority})`,
+        message: `Congratulations! You have accepted a new task: "${task.title}" (Priority: ${task.priority})`,
         metadata: {
           domain: task.domain,
           priority: task.priority,
@@ -491,7 +491,7 @@ exports.declineTask = async (req, res) => {
       recipientModel: 'Attorney',
       type: 'task_declined',
       task: task._id,
-      message: `Paralegal ${paralegal.firstName} ${paralegal.lastName} declined your ${task.domain} task "${task.title}". Reason: ${reason || 'No reason provided'}`,
+      message: `Paralegal ${paralegal.firstName} ${paralegal.lastName} declined your task "${task.title}". Reason: ${reason || 'No reason provided'}`,
       metadata: {
         paralegalId: paralegalId.toString(),
         paralegalName: `${paralegal.firstName} ${paralegal.lastName}`,
@@ -508,7 +508,7 @@ exports.declineTask = async (req, res) => {
       recipientModel: 'Paralegal',
       type: 'task_declined',
       task: task._id,
-      message: `You declined task "${task.title}" (${task.domain}). Reason: ${reason || 'No reason provided'}`,
+      message: `You declined task "${task.title}". Reason: ${reason || 'No reason provided'}`,
       metadata: {
         domain: task.domain,
         priority: task.priority,
