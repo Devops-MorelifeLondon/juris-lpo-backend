@@ -121,6 +121,7 @@ exports.createTask = async (req, res) => {
       estimatedHours,
       checklistItems,
       notes,
+      domain,
       tags
     } = req.body;
 
@@ -143,6 +144,7 @@ exports.createTask = async (req, res) => {
       estimatedHours: estimatedHours ? Number(estimatedHours) : undefined,
       checklistItems: checklistItems || [],
       notes,
+      domain,
       tags: tags || []
     });
 

@@ -8,6 +8,7 @@ const { errorHandler } = require('./middleware/errorHandler');
 const notFound = require('./middleware/notFound');
 
 
+
 const app = express();
 app.use(corsConfig);
 app.set('trust proxy', 1);
@@ -40,6 +41,7 @@ app.get('/health', (req, res) => {
 });
 
 // ✅ 6. Main API routes
+app.use('/api/dashboard', require('./routes/paralegaldash.routes'));
 app.use('/api/attorney/auth', require('./routes/attorney.auth.routes'));
 app.use('/api/cases', require('./routes/case.routes'));
 app.use('/api/tasks', require('./routes/taskRoutes'));

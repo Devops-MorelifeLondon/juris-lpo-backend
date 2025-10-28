@@ -4,9 +4,9 @@ const mongoose = require('mongoose');
 // Get all notifications for the authenticated user
 exports.getNotifications = async (req, res) => {
   try {
-    console.log('User:', req.user);
+
     const userId = req.user._id;
-    console.log('Fetching notifications for user:', userId);
+
 
     const notifications = await Notification.find({ 
       recipient: userId
@@ -15,8 +15,7 @@ exports.getNotifications = async (req, res) => {
     .select('-__v') // Exclude MongoDB version field
     .lean(); // Optimize for read-only queries
 
-    console.log(`Found ${notifications.length} notifications`);
-    console.log('Notifications:', notifications);
+
 
     const unreadCount = notifications.filter(n => !n.isRead).length;
 
@@ -41,9 +40,7 @@ exports.getNotifications = async (req, res) => {
 exports.markNotificationAsRead = async (req, res) => {
   try {
     const { notificationId } = req.params;
-    console.log('Marking notification as read:', notificationId);
-    console.log('User:', req.user);
-
+  
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(notificationId)) {
       return res.status(400).json({
@@ -91,7 +88,6 @@ exports.markNotificationAsRead = async (req, res) => {
       });
     }
 
-    console.log('Notification marked as read:', updatedNotification);
 
     res.status(200).json({
       success: true,

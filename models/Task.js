@@ -1,3 +1,4 @@
+// models/Task.js - Updated schema
 const mongoose = require('mongoose');
 
 const taskSchema = new mongoose.Schema({
@@ -13,21 +14,27 @@ const taskSchema = new mongoose.Schema({
   case: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Case',
-    required: false // Made optional
+    required: false
   },
   assignedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Attorney',
+    ref: 'Attorney', // or User
     required: true
   },
   assignedTo: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Paralegal',
-    required: false // Made optional
+    required: false // Set when accepted
   },
-  demoAssignedTo: {
+
+  domain: { // CRITICAL: Added for filtering
     type: String,
-    required: false
+    enum: [
+      'Family Law', 'Personal Injury', 'Real Estate', 'Estate Planning',
+      'Intellectual Property', 'Business Law', 'Immigration Services',
+      'Bankruptcy', 'Criminal Law', 'Tax Law', 'Employment Law'
+    ],
+    required: true
   },
   type: {
     type: String,
@@ -36,8 +43,8 @@ const taskSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Not Started', 'In Progress', 'Blocked', 'Completed', 'Cancelled'],
-    default: 'Not Started'
+    enum: ['Pending Assignment','To do', 'Not Started', 'In Progress','In Review', 'Blocked', 'Completed', 'Cancelled'],
+    default: 'Pending Assignment'
   },
   priority: {
     type: String,
@@ -48,6 +55,18 @@ const taskSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
+  assignedAt: {
+    type: Date,
+    required: false
+  },
+  declinedBy: [{
+    paralegalId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Paralegal'
+    },
+    reason: String,
+    declinedAt: Date
+  }],
   startDate: Date,
   completedDate: Date,
   estimatedHours: {
@@ -88,7 +107,9 @@ const taskSchema = new mongoose.Schema({
 // Indexes for performance
 taskSchema.index({ assignedBy: 1, status: 1 });
 taskSchema.index({ assignedTo: 1, dueDate: 1 });
-taskSchema.index({ case: 1, status: 1 });
-taskSchema.index({ dueDate: 1 });
+taskSchema.index({ domain: 1, status: 1, 'assignedTo': 1 }); // Critical for domain filtering
+taskSchema.index({ status: 1, dueDate: 1 });
+taskSchema.index({ 'domain': 1, 'status': 1, createdAt: -1 });
+taskSchema.index({ assignedTo: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Task', taskSchema);
