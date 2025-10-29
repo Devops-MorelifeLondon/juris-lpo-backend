@@ -17,7 +17,7 @@ exports.getDashboardStats = async (req, res) => {
     // 1. Calculate ASSIGNED tasks (Not Started or In Progress)
     const pendingTasks = await Task.countDocuments({
       assignedTo: paralegalId,
-      status: { $in: ['Not Started', 'In Progress'] }
+      status: { $in: ['To do', 'Not Started', 'In Progress','In Review',  'Completed' ] }
     });
 
     // 2. Calculate upcoming deadlines (ASSIGNED tasks due in 7 days)

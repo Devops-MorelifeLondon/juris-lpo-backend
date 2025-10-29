@@ -47,6 +47,7 @@ app.use('/api/cases', require('./routes/case.routes'));
 app.use('/api/tasks', require('./routes/taskRoutes'));
 app.use('/api/paralegals', require('./routes/paralegal.auth.routes'));
 app.use('/api/notifications', require('./routes/notificationsRoutes'));
+app.use('/api/tasklogs', require('./routes/taskLogs.routes'))
 
 
 // ✅ 7. 404 + error handlers

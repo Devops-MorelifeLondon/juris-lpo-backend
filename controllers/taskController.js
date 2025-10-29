@@ -725,3 +725,65 @@ exports.getAvailableTasks = async (req, res) => {
     });
   }
 };
+
+
+// controllers/taskController.js - Add this method
+exports.updateChecklist = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { checklistItems } = req.body;
+    const userId = req.user._id;
+
+    // Find task
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Task not found" 
+      });
+    }
+
+    // Authorization: Only paralegal assigned to the task can update checklist
+    const isAuthorized = task.assignedTo?._id?.toString() === userId.toString();
+    
+    if (!isAuthorized) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Only assigned paralegal can update checklist" 
+      });
+    }
+
+    // Validate checklist items
+    if (!Array.isArray(checklistItems)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid checklist format" 
+      });
+    }
+
+    // Update only checklistItems field
+    const updatedTask = await Task.findByIdAndUpdate(
+      taskId,
+      { 
+        checklistItems,
+        updatedAt: new Date()
+      },
+      { 
+        new: true, 
+        runValidators: true,
+        select: 'checklistItems title status assignedTo' // Only return relevant fields
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      data: updatedTask
+    });
+  } catch (error) {
+    console.error('Error updating checklist:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update checklist' 
+    });
+  }
+};

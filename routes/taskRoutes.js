@@ -7,12 +7,16 @@ const {
   updateTask,
   deleteTask,
   updateChecklistItem,
-  getTaskStats
+  getTaskStats,
+  updateChecklist
 } = require('../controllers/taskController');
 const { protect } = require('../middleware/auth');
 
 // All routes require authentication
 router.use(protect);
+
+// ✅ New checklist update route
+router.patch('/:taskId/checklist', updateChecklist);
 
 // Task CRUD routes
 router.route('/')
