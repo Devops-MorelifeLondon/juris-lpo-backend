@@ -33,11 +33,11 @@ const taskLogSchema = new mongoose.Schema({
         enum: ['Attorney', 'Paralegal'],
         required: true
     },
-    performedBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Paralegal', // Or 'Attorney' if needed; adjust based on who logs work
-        required: true
-    }
+   performedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    refPath: 'performedByModel', // 👈 tells Mongoose to use dynamic ref
+    required: true
+  }
 }, {
     timestamps: true // Automatically adds createdAt and updatedAt
 });

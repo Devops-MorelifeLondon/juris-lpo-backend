@@ -73,7 +73,7 @@ exports.getTask = async (req, res) => {
     const task = await Task.findById(req.params.id)
       .populate('case', 'name caseNumber serviceType status client deadline')
       .populate('assignedBy', 'fullName email')
-      .populate('assignedTo', 'fullName email');
+      .populate('assignedTo', 'firstName lastName email');
 
     if (!task) {
       return res.status(404).json({
