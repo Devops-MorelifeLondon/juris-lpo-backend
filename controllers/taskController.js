@@ -255,8 +255,8 @@ exports.createTask = async (req, res) => {
       const recipients = batch.map(p => ({
         email: p.email,
         name: `${p.firstName} ${p.lastName}`
-      })).filter(d => d.email != 'ritz@jurislpo.com');
-      console.log(recipients);
+      }));
+   
 
       // Send to each paralegal individually for personalization
       const emailPromises = recipients.map(async (recipient) => {
