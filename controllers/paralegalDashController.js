@@ -173,17 +173,16 @@ exports.getAvailableTasks = async (req, res) => {
 
     const allowedDomains = [...new Set([...(paralegal.practiceAreas || []), ...(paralegal.specializations || [])])];
 
-    if (allowedDomains.length === 0) {
-      return res.status(200).json({
-        data: [],
-        message: 'No practice areas defined. Update your profile to see available tasks.',
-        capacity: { current: currentLoad, max: maxCapacity, availableSlots }
-      });
-    }
+    // if (allowedDomains.length === 0) {
+    //   return res.status(200).json({
+    //     data: [],
+    //     message: 'No practice areas defined. Update your profile to see available tasks.',
+    //     capacity: { current: currentLoad, max: maxCapacity, availableSlots }
+    //   });
+    // }
 
     // Build filters for available tasks
     const baseFilter = {
-      domain: { $in: allowedDomains },
       status: 'Pending Assignment',
       assignedTo: { $exists: false }, // Not assigned yet
       // Exclude tasks this paralegal already declined
