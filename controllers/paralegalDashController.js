@@ -95,7 +95,7 @@ exports.getAssignedTasks = async (req, res) => {
     // Fetch assigned tasks
     const tasks = await Task.find(baseFilter)
       .populate('case', 'title caseNumber clientName')
-      .populate('assignedBy', 'firstName lastName email')
+      .populate('assignedBy', 'fullName email')
       .sort({ createdAt: -1 })
       .limit(limitNum)
       .lean();

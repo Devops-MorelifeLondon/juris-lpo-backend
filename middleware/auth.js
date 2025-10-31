@@ -9,9 +9,12 @@ exports.protect = async (req, res, next) => {
 
 
      // 1. Check Authorization header first
-    if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-      token = req.headers.authorization.split(" ")[1];
-    }
+ if (req.headers.authorization?.startsWith("Bearer ")) {
+  token = req.headers.authorization.split(" ")[1];
+} else if (req.cookies?.token) {
+  token = req.cookies.token;
+}
+
 
     // 2. If no token in header, check cookies
     if (!token && req.cookies?.token) {
