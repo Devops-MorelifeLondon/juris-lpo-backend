@@ -87,7 +87,7 @@ exports.createParalegal = async (req, res) => {
       { expiresIn: "30m" }
     );
 
-    const verificationUrl = `${process.env.BACKEND_URL}/api/paralegal/verify-email/${token}`;
+    const verificationUrl = `${process.env.BACKEND_URL}/api/paralegals/verify-email/${token}`;
     const fullName = `${paralegal.firstName} ${paralegal.lastName}`;
 
     // 5️⃣ Send verification email (non-blocking, safely handled)
