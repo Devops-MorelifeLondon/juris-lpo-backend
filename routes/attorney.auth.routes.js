@@ -13,7 +13,8 @@ const {
   completeProfile,
   updateProfile,
   deleteAccount,
-  googlelogin
+  googlelogin,
+  validateResetToken
 } = require('../controllers/attorney.auth.controller');
 
 const { protect, requireCompleteProfile, requireVerifiedEmail } = require('../middleware/attorney.auth');
@@ -30,9 +31,10 @@ const { authLimiter, passwordResetLimiter } = require('../middleware/rateLimiter
 router.post('/register', register);
 router.post('/google-login', googlelogin);
 router.post('/login', login);
+router.post('/forgot-password', forgotPassword);
 router.get('/verify-email/:token', verifyEmail);
-router.post('/forgot-password', passwordResetLimiter, validateEmail, forgotPassword);
 router.put('/reset-password/:token', resetPassword);
+router.get('/validate-reset-token/:token', validateResetToken);
 
 // Protected routes (require authentication)
 router.get('/me', protect, getMe);

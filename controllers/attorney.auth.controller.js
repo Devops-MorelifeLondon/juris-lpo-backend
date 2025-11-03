@@ -8,6 +8,7 @@ const connectDB = require('../config/db');
 
 
 
+
 // Generate JWT Token
 const generateToken = (id) => {
   return jwt.sign({ id, role: 'attorney' }, process.env.JWT_SECRET, {
@@ -503,7 +504,9 @@ exports.verifyEmail = async (req, res) => {
 // @access  Public
 exports.forgotPassword = async (req, res) => {
   try {
+    console.log("IT IS HITTED");
     const { email } = req.body;
+    console.log(email);
 
     const attorney = await Attorney.findOne({ email });
 
@@ -514,26 +517,16 @@ exports.forgotPassword = async (req, res) => {
       });
     }
 
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    
-    attorney.resetPasswordToken = crypto
-      .createHash('sha256')
-      .update(resetToken)
-      .digest('hex');
-    
-    attorney.resetPasswordExpires = Date.now() + 30 * 60 * 1000; // 30 minutes
-    
-    await attorney.save();
+  const resetToken = jwt.sign({ id: attorney._id }, process.env.JWT_SECRET, { expiresIn: '30m' });
 
-    // Create reset URL and send email using template
-    const resetUrl = `${process.env.FRONTEND_URL}/attorney/reset-password/${resetToken}`;
+       // Create reset URL and send email using template
+    const resetUrl = `${process.env.ATTORNEY_FRONTEND_URL}/auth/reset-password/${resetToken}`;
 
     try {
-      await sendEmail({
-        to: email,
-        subject: 'Password Reset Request - Juris-LPO',
-        html: emailTemplates.attorneyPasswordResetTemplate(attorney.firstName, resetUrl)
+      await sendBrevoEmailApi({
+        to_email: [{ email: email, name: attorney.fullName }],
+        email_subject: 'Password Reset Request - Juris-LPO',
+        htmlContent: emailTemplates.attorneyPasswordResetTemplate(attorney.fullName, resetUrl)
       });
 
       res.status(200).json({
@@ -542,9 +535,8 @@ exports.forgotPassword = async (req, res) => {
       });
 
     } catch (emailError) {
-      attorney.resetPasswordToken = undefined;
-      attorney.resetPasswordExpires = undefined;
-      await attorney.save();
+
+     console.log(emailError);
 
       return res.status(500).json({
         success: false,
@@ -567,6 +559,7 @@ exports.forgotPassword = async (req, res) => {
 // @access  Public
 exports.resetPassword = async (req, res) => {
   try {
+    console.log("reset It is hitted")
     const { token } = req.params;
     const { password } = req.body;
 
@@ -577,28 +570,13 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    // Hash token
-    const resetPasswordToken = crypto
-      .createHash('sha256')
-      .update(token)
-      .digest('hex');
+   const {id} = jwt.verify(token, process.env.JWT_SECRET);
+   const attorney = await Attorney.findById(id);
+   attorney.password = password;
 
-    const attorney = await Attorney.findOne({
-      resetPasswordToken,
-      resetPasswordExpires: { $gt: Date.now() }
-    });
-
-    if (!attorney) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired reset token'
-      });
-    }
-
+ 
     // Set new password
-    attorney.password = password;
-    attorney.resetPasswordToken = undefined;
-    attorney.resetPasswordExpires = undefined;
+
     await attorney.save();
 
     sendTokenResponse(attorney, 200, res);
@@ -702,6 +680,64 @@ exports.deleteAccount = async (req, res) => {
       success: false,
       message: 'Server error',
       error: error.message
+    });
+  }
+};
+
+
+exports.validateResetToken = async (req, res) => {
+  try {
+    console.log("it is hitted");
+    const { token } = req.params;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token is required'
+      });
+    }
+
+    // Verify JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { id } = decoded;
+
+    // Check if user exists and token hasn't expired
+    const attorney = await Attorney.findById(id);
+    if (!attorney) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // You might want to check token expiration separately
+    // This assumes your JWT has an exp claim
+
+    res.status(200).json({
+      success: true,
+      message: 'Token is valid',
+      userId: id
+    });
+
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token'
+      });
+    }
+    
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token has expired'
+      });
+    }
+
+    console.error('Token validation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
     });
   }
 };
