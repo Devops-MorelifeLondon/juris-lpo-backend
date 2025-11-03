@@ -93,7 +93,7 @@ exports.register = async (req, res) => {
     });
 
     // ✅ Construct verification URL
-    const verificationUrl = `${process.env.FRONTEND_URL}/attorney/verify-email/${verificationToken}`;
+    const verificationUrl = `${process.env.BACKEND_URL}/api/attorney/auth/verify-email/${verificationToken}`;
 
     // ✅ Prepare and send Brevo email
     try {
@@ -169,7 +169,7 @@ exports.googlelogin = async (req, res) => {
       });
 
       // Send verification email
-      const verificationUrl = `${process.env.FRONTEND_URL}/attorney/verify-email/${verificationToken}`;
+      const verificationUrl = `${process.env.BACKEND_URL}/api/auth/attorney/verify-email/${verificationToken}`;
       try {
         await sendBrevoEmailApi({
           to_email: { email, name: fullName },
