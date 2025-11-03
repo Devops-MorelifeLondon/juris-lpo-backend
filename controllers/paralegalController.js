@@ -1,10 +1,14 @@
 // controllers/paralegalController.js
-const Paralegal = require('../models/Paralegal');
+
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+
 const crypto = require('crypto');
 const connectDB = require('../config/db');
 const { OAuth2Client } = require('google-auth-library');
+const { sendBrevoEmailApi } = require('../lib/emailBrevoSdk');
+const emailTemplates = require('../lib/emailTemplates');
+const jwt = require("jsonwebtoken");
+const Paralegal = require("../models/Paralegal"); // adjust path as needed
 
 
 const generateToken = (id) => {
@@ -41,17 +45,149 @@ const sendTokenResponse = (paralegal, statusCode, res) => {
 // Create a new paralegal
 exports.createParalegal = async (req, res) => {
   try {
-    console.log(req.body);
     const { firstName, lastName, email, password, confirmPassword } = req.body;
-    const paralegal = new Paralegal({ firstName, lastName, email, password });
+
+    // 1️⃣ Input Validation
+    if (!firstName || !lastName || !email || !password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match",
+      });
+    }
+
+    // 2️⃣ Check if user already exists
+    const existingParalegal = await Paralegal.findOne({ email: email.trim().toLowerCase() });
+    if (existingParalegal) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is already registered",
+      });
+    }
+
+    // 3️⃣ Create new paralegal
+    const paralegal = new Paralegal({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.trim().toLowerCase(),
+      password,
+    });
     await paralegal.save();
 
-    sendTokenResponse(paralegal, 201, res);
+    // 4️⃣ Generate Email Verification Token (valid for 30 min)
+    const token = jwt.sign(
+      { id: paralegal._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "30m" }
+    );
+
+    const verificationUrl = `${process.env.BACKEND_URL}/api/paralegal/verify-email/${token}`;
+    const fullName = `${paralegal.firstName} ${paralegal.lastName}`;
+
+    // 5️⃣ Send verification email (non-blocking, safely handled)
+    try {
+      await sendBrevoEmailApi({
+        to_email: [{ email, name: fullName }],
+        email_subject: "Verify Your Juris-LPO Paralegal Account",
+        htmlContent: emailTemplates.paralegalVerificationTemplate(fullName, verificationUrl),
+      });
+    } catch (emailError) {
+      console.error("Email sending failed:", emailError.message);
+      // Email fail should not block user creation
+    }
+
+    // 6️⃣ Send success + JWT for immediate login (optional)
+    sendTokenResponse(paralegal, 201, res, {
+      message: "Paralegal registered successfully. Please verify your email.",
+    });
+
   } catch (error) {
-    console.log(error);
-    res.status(400).json({ success: false, error: error.message });
+    console.error("Error creating paralegal:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error. Please try again later.",
+    });
   }
 };
+
+
+exports.verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    // 1️⃣ Check if token is provided
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Verification token is missing",
+      });
+    }
+
+    // 2️⃣ Verify JWT token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      const message =
+        err.name === "TokenExpiredError"
+          ? "Verification link has expired"
+          : "Invalid verification token";
+      return res.status(400).json({
+        success: false,
+        message,
+      });
+    }
+
+    // 3️⃣ Extract user ID from decoded token
+    const { id } = decoded;
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid verification data",
+      });
+    }
+
+    // 4️⃣ Find user
+    const paralegal = await Paralegal.findById(id);
+    if (!paralegal) {
+      return res.status(404).json({
+        success: false,
+        message: "Account not found or already removed",
+      });
+    }
+
+    // 5️⃣ Check if already verified
+    if (paralegal.isVerified) {
+      return res.status(200).json({
+        success: true,
+        message: `${paralegal.email} is already verified`,
+      });
+    }
+
+    // 6️⃣ Update verification status
+    paralegal.isVerified = true;
+    await paralegal.save();
+
+    // 7️⃣ Success response
+    res.status(200).json({
+      success: true,
+      message: `${paralegal.email} has been successfully verified`,
+    });
+  } catch (error) {
+    console.error("Error verifying email:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error, please try again later",
+    });
+  }
+};
+
 
 // Get all paralegals
 exports.getAllParalegals = async (req, res) => {
@@ -166,29 +302,29 @@ exports.googlelogin = async (req, res) => {
     // Check if attorney already exists
     let paralegal = await Paralegal.findOne({ email });
 
-    if (!paralegal) {
-      // Create new attorney
-      const verificationToken = crypto.randomBytes(32).toString("hex");
-      paralegal = await Paralegal.create({
-        firstName,
-        lastName,
-        email,
-        avatar: picture
-      });
+    // if (!paralegal) {
+    //   // Create new attorney
+    //   const verificationToken = crypto.randomBytes(32).toString("hex");
+    //   paralegal = await Paralegal.create({
+    //     firstName,
+    //     lastName,
+    //     email,
+    //     avatar: picture
+    //   });
 
-      // Send verification email
-      const verificationUrl = `${process.env.FRONTEND_URL}/paralegal/verify-email/${verificationToken}`;
-      try {
-        await sendBrevoEmailApi({
-          to_email: { email, name: fullName },
-          email_subject: "Verify Your Juris-LPO Paralegal Account",
-          htmlContent: emailTemplates.attorneyVerificationTemplate(fullName, verificationUrl)
-        });
-        console.log("📧 Verification email sent to:", email);
-      } catch (emailError) {
-        console.error("❌ Email sending failed:", emailError.message);
-      }
-    }
+    //   // Send verification email
+    //   const verificationUrl = `${process.env.FRONTEND_URL}/paralegal/verify-email/${verificationToken}`;
+    //   try {
+    //     await sendBrevoEmailApi({
+    //       to_email: { email, name: fullName },
+    //       email_subject: "Verify Your Juris-LPO Paralegal Account",
+    //       htmlContent: emailTemplates.attorneyVerificationTemplate(fullName, verificationUrl)
+    //     });
+    //     console.log("📧 Verification email sent to:", email);
+    //   } catch (emailError) {
+    //     console.error("❌ Email sending failed:", emailError.message);
+    //   }
+    // }
 
     // Send JWT token to frontend
     sendTokenResponse(paralegal, 200, res);

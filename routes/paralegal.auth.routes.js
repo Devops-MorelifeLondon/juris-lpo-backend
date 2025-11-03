@@ -10,6 +10,8 @@ router.post('/', paralegalController.createParalegal);
 router.post('/login', paralegalController.loginParalegal);
 router.post('/auth/google-login', paralegalController.googlelogin);
 router.get('/', paralegalController.getAllParalegals);
+router.get('/verify-email/:token', paralegalController.verifyEmail);
+
 router.use(protect);
 router.get('/singleparalegal', paralegalController.getParalegalById);
 router.route('/availableStatus')
