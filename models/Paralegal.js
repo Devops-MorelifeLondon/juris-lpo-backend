@@ -157,9 +157,9 @@ const paralegalSchema = new mongoose.Schema({
     default: true
   },
   lastLogin: Date,
-  resetPasswordToken: String,
-  resetPasswordExpires: Date,
-  verificationToken: String
+   passwordResetToken: String,
+  passwordResetExpires: Date,
+  verificationToken: String,
 }, {
   timestamps: true
 });

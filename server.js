@@ -7,6 +7,14 @@ dotenv.config();
 
 const PORT = process.env.PORT || 5000;
 
+console.log('STREAM_API_KEY:', process.env.STREAM_API_KEY);
+console.log('STREAM_API_SECRET:', process.env.STREAM_API_SECRET ? 'Loaded ✅' : '❌ Missing');
+
+
+if (!process.env.STREAM_API_KEY || !process.env.STREAM_API_SECRET) {
+  throw new Error('STREAM API credentials missing — please check .env');
+}
+
 // ✅ Wait for MongoDB to connect before starting server
 (async () => {
   try {

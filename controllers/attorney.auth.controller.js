@@ -741,3 +741,13 @@ exports.validateResetToken = async (req, res) => {
     });
   }
 };
+
+// Get all paralegals
+exports.getAllAttorneys = async (req, res) => {
+  try {
+    const paralegals = await Attorney.find();
+    res.status(200).json({ success: true, data: paralegals });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};

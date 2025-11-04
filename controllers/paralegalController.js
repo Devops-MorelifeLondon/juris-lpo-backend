@@ -387,3 +387,154 @@ exports.availableStatus = async (req, res) => {
   }
 };
 
+
+
+// ==========================
+// 🔐 Forgot Password Controller
+// ==========================
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // 1️⃣ Validate Email
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: "Please provide your registered email",
+      });
+    }
+
+    // 2️⃣ Check if paralegal exists
+    const paralegal = await Paralegal.findOne({ email });
+    if (!paralegal) {
+      return res.status(404).json({
+        success: false,
+        error: "No account found with this email address",
+      });
+    }
+
+    // 3️⃣ Generate a reset token (valid for 30 min)
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenHash = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    // Save reset token and expiry in DB
+    paralegal.passwordResetToken = resetTokenHash;
+    paralegal.passwordResetExpires = Date.now() + 30 * 60 * 1000; // 30 minutes
+    await paralegal.save({ validateBeforeSave: false });
+
+    // 4️⃣ Create Reset URL (Frontend URL)
+    const resetUrl = `${process.env.PARALEGAL_FRONTEND_URL}/reset-password/${resetToken}`;
+
+    // 5️⃣ Send Email
+    try {
+      await sendBrevoEmailApi({
+        to_email: [{ email: paralegal.email, name: paralegal.firstName }],
+        email_subject: "Reset Your Juris-LPO Paralegal Password",
+        htmlContent: emailTemplates.paralegalPasswordResetTemplate(
+          paralegal.firstName,
+          resetUrl
+        ),
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Password reset link has been sent to your email address.",
+      });
+    } catch (emailError) {
+      // Remove token fields if email sending fails
+      paralegal.passwordResetToken = undefined;
+      paralegal.passwordResetExpires = undefined;
+      await paralegal.save({ validateBeforeSave: false });
+
+      console.error("Email sending failed:", emailError.message);
+      res.status(500).json({
+        success: false,
+        error: "Failed to send reset email. Please try again later.",
+      });
+    }
+  } catch (error) {
+    console.error("Forgot Password Error:", error.message);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error. Please try again later.",
+    });
+  }
+};
+
+// ==========================
+// 🔁 Reset Password Controller
+// ==========================
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password, confirmPassword } = req.body;
+
+    // 1️⃣ Validate Input
+    if (!password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: "Both password and confirm password are required",
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: "Passwords do not match",
+      });
+    }
+
+    // 2️⃣ Hash the token for DB lookup
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    // 3️⃣ Find paralegal with valid (non-expired) token
+    const paralegal = await Paralegal.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: Date.now() },
+    });
+
+    if (!paralegal) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid or expired reset token",
+      });
+    }
+
+    // 4️⃣ Update password and clear reset fields
+    paralegal.password = password;
+    paralegal.passwordResetToken = undefined;
+    paralegal.passwordResetExpires = undefined;
+    await paralegal.save();
+
+    // 5️⃣ Send confirmation email
+    try {
+      await sendBrevoEmailApi({
+        to_email: [{ email: paralegal.email, name: paralegal.firstName }],
+        email_subject: "Your Juris-LPO Password Was Changed",
+        htmlContent: `
+          <h2>Hello ${paralegal.firstName},</h2>
+          <p>Your password has been successfully reset. If you did not perform this action, please contact our support team immediately.</p>
+          <p style="color: #6b7280; font-size: 13px;">Juris-LPO Security Team</p>
+        `,
+      });
+    } catch (err) {
+      console.error("Confirmation email failed:", err.message);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Password has been successfully reset. You can now log in.",
+    });
+  } catch (error) {
+    console.error("Reset Password Error:", error.message);
+    res.status(500).json({
+      success: false,
+      error: "Server error during password reset. Please try again later.",
+    });
+  }
+};
+
+

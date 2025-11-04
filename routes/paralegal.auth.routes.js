@@ -11,6 +11,11 @@ router.post('/login', paralegalController.loginParalegal);
 router.post('/auth/google-login', paralegalController.googlelogin);
 router.get('/', paralegalController.getAllParalegals);
 router.get('/verify-email/:token', paralegalController.verifyEmail);
+// Forgot Password
+router.post("/forgot-password", paralegalController.forgotPassword);
+
+// Reset Password
+router.post("/reset-password/:token", paralegalController.resetPassword);
 
 router.use(protect);
 router.get('/singleparalegal', paralegalController.getParalegalById);

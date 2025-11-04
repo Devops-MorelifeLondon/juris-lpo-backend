@@ -6,6 +6,8 @@ const { helmetConfig, xssClean, hpp } = require('./middleware/security');
 const { apiLimiter } = require('./middleware/rateLimiter');
 const { errorHandler } = require('./middleware/errorHandler');
 const notFound = require('./middleware/notFound');
+const chatRoutes = require('./routes/chatRoutes');
+
 
 
 
@@ -48,6 +50,8 @@ app.use('/api/tasks', require('./routes/taskRoutes'));
 app.use('/api/paralegals', require('./routes/paralegal.auth.routes'));
 app.use('/api/notifications', require('./routes/notificationsRoutes'));
 app.use('/api/tasklogs', require('./routes/taskLogs.routes'))
+// Routes
+app.use('/api/chat', chatRoutes);
 
 
 // ✅ 7. 404 + error handlers
