@@ -1,45 +1,43 @@
-const { StreamChat } = require('stream-chat');
-const Attorney = require('../models/Attorney');
-const Paralegal = require('../models/Paralegal');
+const { StreamChat } = require("stream-chat");
+const Attorney = require("../models/Attorney");
+const Paralegal = require("../models/Paralegal");
 
-let client; // lazy initialization
+let client;
 
+// Lazy initialize Stream client
 function getClient() {
   if (!client) {
     if (!process.env.STREAM_API_KEY || !process.env.STREAM_API_SECRET) {
-      console.error('❌ Stream API credentials missing — please check .env');
-      throw new Error('STREAM credentials missing');
+      throw new Error("Stream credentials missing");
     }
-
     client = StreamChat.getInstance(
       process.env.STREAM_API_KEY,
       process.env.STREAM_API_SECRET
     );
-
-    console.log('✅ Stream client initialized');
+    console.log("✅ Stream client initialized");
   }
   return client;
 }
 
-// ========================
-// Generate chat token
-// ========================
+// =============================
+// Generate Token for Frontend
+// =============================
 exports.getChatToken = async (req, res) => {
   try {
-    console.log('🔥 Hit /api/chat/get-token');
     const client = getClient();
-
     const user = req.user;
-    const role = req.role;
-    const name = user.fullName || `${user.firstName} ${user.lastName}` || 'User';
-    const avatar = user.avatar || null;
 
-    const userId = user._id.toString(); // ✅ always string
+    const userId = user._id.toString();
+    const name =
+      user.fullName ||
+      `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+      "User";
 
+    // ✅ Always upsert before token creation
     await client.upsertUser({
       id: userId,
       name,
-      image: avatar,
+      image: user.avatar || null,
     });
 
     const token = client.createToken(userId);
@@ -48,20 +46,17 @@ exports.getChatToken = async (req, res) => {
       success: true,
       token,
       apiKey: process.env.STREAM_API_KEY,
-      user: { id: userId, name, role, avatar },
+      user: { id: userId, name },
     });
   } catch (err) {
-    console.error('❌ getChatToken error:', err.message);
+    console.error("❌ getChatToken error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
 
-// ========================
-// Create or get chat channel
-// ========================
-// ========================
-// Create or get chat channel
-// ========================
+// =============================
+// Create or Get Chat Channel
+// =============================
 exports.createChatChannel = async (req, res) => {
   try {
     const client = getClient();
@@ -69,60 +64,95 @@ exports.createChatChannel = async (req, res) => {
     const targetId = req.body.targetId;
 
     if (!targetId) {
-      return res.status(400).json({ message: 'Target user ID required' });
+      return res.status(400).json({ message: "Target user ID required" });
     }
 
-    // ✅ Fetch both users (replace with your actual models)
+    // ✅ Fetch both users
     const currentUser =
-      (await Attorney.findById(user.id)) || (await Paralegal.findById(user.id));
+      (await Attorney.findById(user._id)) ||
+      (await Paralegal.findById(user._id));
     const targetUser =
-      (await Attorney.findById(targetId)) || (await Paralegal.findById(targetId));
+      (await Attorney.findById(targetId)) ||
+      (await Paralegal.findById(targetId));
+
+    if (!currentUser || !targetUser) {
+      return res
+        .status(404)
+        .json({ message: "One or both users not found in database" });
+    }
 
     const currentUserName =
-      currentUser?.fullName ||
-      `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() ||
-      'User';
+      currentUser.fullName ||
+      `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() ||
+      "User";
     const targetUserName =
-      targetUser?.fullName ||
-      `${targetUser?.firstName || ''} ${targetUser?.lastName || ''}`.trim() ||
-      'User';
+      targetUser.fullName ||
+      `${targetUser.firstName || ""} ${targetUser.lastName || ""}`.trim() ||
+      "User";
 
-    // ✅ Ensure both exist on Stream
+    // ✅ Ensure both users exist on Stream
     await client.upsertUsers([
       {
-        id: user.id.toString(),
+        id: user._id.toString(),
         name: currentUserName,
-        image: currentUser?.avatar || null,
+        image: currentUser.avatar || null,
       },
       {
         id: targetId.toString(),
         name: targetUserName,
-        image: targetUser?.avatar || null,
+        image: targetUser.avatar || null,
       },
     ]);
 
-    // ✅ Create or get existing channel
-    const channelId = `chat_${[user.id, targetId].sort().join('_')}`;
-    const channel = client.channel('messaging', channelId, {
-      members: [user.id.toString(), targetId.toString()],
-      name: `Chat between ${currentUserName} and ${targetUserName}`, // ✅
-      created_by_id: user.id.toString(),
+    // ✅ Check if channel already exists between both users
+    const filter = {
+      type: "messaging",
+      member_count: 2,
+      members: { $in: [user._id.toString()] },
+    };
+
+    const existingChannels = await client.queryChannels(filter);
+    const existing = existingChannels.find((ch) => {
+      const m = ch.state.members;
+      return (
+        m[user._id.toString()] && m[targetId.toString()]
+      );
+    });
+
+    if (existing) {
+      // ✅ Return existing channel ID
+      return res.status(200).json({
+        success: true,
+        channelId: existing.id,
+        alreadyExists: true,
+      });
+    }
+
+    // ✅ Create new channel only if not exists
+    const channelId = `chat_${[user._id, targetId].sort().join("_")}`;
+    const channel = client.channel("messaging", channelId, {
+      members: [user._id.toString(), targetId.toString()],
+      name: `Chat: ${currentUserName} & ${targetUserName}`,
+      created_by_id: user._id.toString(),
     });
 
     await channel.create();
 
-    res.status(200).json({ success: true, channelId });
+    res.status(200).json({
+      success: true,
+      channelId,
+      alreadyExists: false,
+    });
   } catch (err) {
-    console.error('❌ createChatChannel error:', err.message);
+    console.error("❌ createChatChannel error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
 
 
-
-// ========================
-// Get user channels
-// ========================
+// =============================
+// Get User Channels
+// =============================
 exports.getUserChannels = async (req, res) => {
   try {
     const client = getClient();
@@ -130,7 +160,7 @@ exports.getUserChannels = async (req, res) => {
     const channels = await client.queryChannels(filter);
     res.status(200).json({ success: true, channels });
   } catch (err) {
-    console.error('❌ getUserChannels error:', err.message);
+    console.error("❌ getUserChannels error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
