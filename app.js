@@ -7,7 +7,7 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 const { errorHandler } = require('./middleware/errorHandler');
 const notFound = require('./middleware/notFound');
 const chatRoutes = require('./routes/chatRoutes');
-
+const meetingRoutes = require('./routes/meetingRoutes');
 
 
 
@@ -52,6 +52,7 @@ app.use('/api/notifications', require('./routes/notificationsRoutes'));
 app.use('/api/tasklogs', require('./routes/taskLogs.routes'))
 // Routes
 app.use('/api/chat', chatRoutes);
+app.use('/api', meetingRoutes);
 
 
 // ✅ 7. 404 + error handlers
