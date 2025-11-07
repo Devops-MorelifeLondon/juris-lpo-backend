@@ -90,8 +90,7 @@ exports.createTaskLog = async (req, res) => {
     const { taskId } = req.params;
     const { title, description, type, hoursSpent, status } = req.body;
     const userId = req.user._id;
-    console.log("Req User : ", userId);
-    console.log("Req User : ", req.user);
+   
 
     // Validate required fields
     if (!title || !description || !type || hoursSpent === undefined || hoursSpent < 0) {
