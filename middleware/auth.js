@@ -13,6 +13,7 @@ exports.protect = async (req, res, next) => {
       token = req.cookies.token;
     }
 
+    console.log("Token ", token);
    
 
     // ✅ 2. Validate token
@@ -36,6 +37,7 @@ exports.protect = async (req, res, next) => {
     }
 
     req.user = { ...user.toObject(), role };
+    console.log("REQ : ", req.user);
  
     next();
   } catch (err) {

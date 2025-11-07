@@ -12,15 +12,16 @@ const { default: mongoose } = require('mongoose');
 // Get real-time dashboard statistics
 exports.getDashboardStats = async (req, res) => {
   try {
-    const paralegalId = req.user.id;
+    const paralegalId = req.user._id;
+    console.log("🟢 Paralegal ID:", paralegalId);
 
-    // 1. Calculate ASSIGNED tasks (Not Started or In Progress)
+    // 1️⃣ Count assigned tasks
     const pendingTasks = await Task.countDocuments({
       assignedTo: paralegalId,
-      status: { $in: ['To do', 'Not Started', 'In Progress','In Review',  'Completed' ] }
+      status: { $in: ['To do', 'Not Started', 'In Progress', 'In Review', 'Completed'] }
     });
 
-    // 2. Calculate upcoming deadlines (ASSIGNED tasks due in 7 days)
+    // 2️⃣ Upcoming deadlines (next 7 days)
     const now = new Date();
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     const upcomingDeadlines = await Task.countDocuments({
@@ -29,55 +30,78 @@ exports.getDashboardStats = async (req, res) => {
       status: { $ne: 'Completed' }
     });
 
-    // 3. Calculate overdue tasks (ASSIGNED tasks past due)
+    // 3️⃣ Overdue tasks
     const overdueTasksCount = await Task.countDocuments({
       assignedTo: paralegalId,
       dueDate: { $lt: now },
       status: { $ne: 'Completed' }
     });
 
-    // 4. Calculate AVAILABLE tasks (Pending Assignment in paralegal's domains)
-    const paralegal = await Paralegal.findById(paralegalId).select('practiceAreas specializations currentActiveCases maxActiveCases');
-    const allowedDomains = [...new Set([...(paralegal.practiceAreas || []), ...(paralegal.specializations || [])])];
-    
-    // Check capacity first
+    // 4️⃣ Paralegal profile fetch
+    const paralegal = await Paralegal.findById(paralegalId)
+      .select('practiceAreas specializations currentActiveCases maxActiveCases');
+
+    if (!paralegal) {
+      console.warn(`⚠️ No Paralegal document found for user: ${paralegalId}`);
+      return res.status(200).json({
+        pendingTasks,
+        upcomingDeadlines,
+        overdueTasksCount,
+        availableTasksCount: 0,
+        currentLoad: 0,
+        maxCapacity: 0,
+        availableSlots: 0,
+        totalWorkload: pendingTasks,
+        message: "No paralegal profile found. Please complete your profile setup."
+      });
+    }
+
+    // 5️⃣ Domain + Capacity calculation
+    const allowedDomains = [
+      ...(paralegal.practiceAreas || []),
+      ...(paralegal.specializations || [])
+    ];
+
     const currentLoad = paralegal.currentActiveCases || 0;
     const maxCapacity = paralegal.maxActiveCases || 10;
     const availableSlots = Math.max(0, maxCapacity - currentLoad);
 
+    // 6️⃣ Count available tasks only if capacity and domains exist
     let availableTasksCount = 0;
     if (allowedDomains.length > 0 && availableSlots > 0) {
       availableTasksCount = await Task.countDocuments({
         domain: { $in: allowedDomains },
         status: 'Pending Assignment',
-        assignedTo: { $exists: false }, // Not yet assigned
-        // Exclude tasks this paralegal already declined
+        assignedTo: { $exists: false },
         'declinedBy.paralegalId': { $ne: paralegalId }
       });
     }
 
+    // 7️⃣ Final stats
     const stats = {
-      pendingTasks, // Assigned tasks waiting for work
-      upcomingDeadlines, // Assigned tasks with upcoming due dates
-      overdueTasksCount, // Assigned tasks that are overdue
-      availableTasksCount, // Available tasks in domains that can be accepted
-      currentLoad, // Current assigned tasks count
-      maxCapacity, // Maximum allowed tasks
-      availableSlots, // Remaining capacity
-      totalWorkload: pendingTasks + availableTasksCount // Combined view
+      pendingTasks,
+      upcomingDeadlines,
+      overdueTasksCount,
+      availableTasksCount,
+      currentLoad,
+      maxCapacity,
+      availableSlots,
+      totalWorkload: pendingTasks + availableTasksCount
     };
 
     res.status(200).json(stats);
+
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
+    console.error('❌ Error fetching dashboard stats:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard statistics' });
   }
 };
 
+
 // Get assigned tasks (tasks this paralegal is working on)
 exports.getAssignedTasks = async (req, res) => {
   try {
-    const paralegalId = req.user.id;
+    const paralegalId = req.user._id;
     const { limit = 5, status, priority } = req.query;
     const limitNum = parseInt(limit) || 5;
 
@@ -444,7 +468,7 @@ exports.declineTask = async (req, res) => {
   try {
     const { taskId } = req.params;
     const { reason } = req.body;
-    const paralegalId = req.user.id;
+    const paralegalId = req.user._id;
 
     // Get paralegal details for domain verification
     const paralegal = await Paralegal.findById(paralegalId).select('practiceAreas specializations firstName lastName');
@@ -548,7 +572,7 @@ exports.declineTask = async (req, res) => {
 // Get task history (all tasks this paralegal has interacted with)
 exports.getTaskHistory = async (req, res) => {
   try {
-    const paralegalId = req.user.id;
+    const paralegalId = req.user._id;
     const { limit = 20, status, type } = req.query;
     const limitNum = parseInt(limit) || 20;
 

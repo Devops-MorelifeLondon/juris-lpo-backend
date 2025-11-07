@@ -69,7 +69,11 @@ exports.googleCallback = async (req, res) => {
     );
 
     console.log("✅ Google tokens saved for user:", user.email);
-    return res.redirect(`${process.env.ATTORNEY_FRONTEND_URL}/meetings`);
+    if(decoded.role == 'attorney'){
+      return res.redirect(`${process.env.ATTORNEY_FRONTEND_URL}/meetings`);
+    }else{
+       return res.redirect(`${process.env.PARALEGAL_FRONTEND_URL}/meetings`);
+    }
   } catch (error) {
     console.error("❌ OAuth error:", error.message);
     res.status(500).json({ error: "OAuth failed", details: error.message });
@@ -167,6 +171,7 @@ exports.scheduleMeeting = async (req, res) => {
 
 
 // STEP 4: Get Upcoming Meetings
+// STEP 4: Get All Meetings (Attorney or Paralegal)
 exports.getAllMeetings = async (req, res) => {
   try {
     const now = new Date();
@@ -174,22 +179,36 @@ exports.getAllMeetings = async (req, res) => {
     console.log("👤 Authenticated user:", user);
 
     const role = user.role === "attorney" ? "Attorney" : "Paralegal";
-    const baseFilter =
-      role === "Attorney"
-        ? { createdBy: new mongoose.Types.ObjectId(user._id) }
-        : { participants: new mongoose.Types.ObjectId(user._id) };
 
-    // Fetch everything first for visibility
-    const allMeetings = await Meeting.find(baseFilter).sort({ startTime: 1 });
+    // Fetch meetings where the user is either the creator or a participant
+    const baseFilter = {
+      $or: [
+        {
+          createdBy: new mongoose.Types.ObjectId(user._id),
+          creatorType: role,
+        },
+        {
+          participants: new mongoose.Types.ObjectId(user._id),
+        },
+      ],
+    };
+
+    const allMeetings = await Meeting.find(baseFilter)
+      .sort({ startTime: 1 })
+      .populate("createdBy", "fullName firstName lastName email")
+      .populate("participants", "fullName firstName lastName email");
+
     console.log("🧩 All meetings found for user:", allMeetings.length);
 
-    const upcoming = allMeetings.filter(m => new Date(m.startTime) > now);
+    const upcoming = allMeetings.filter((m) => new Date(m.startTime) > now);
     const ongoing = allMeetings.filter(
-      m => new Date(m.startTime) <= now && new Date(m.endTime) >= now
+      (m) => new Date(m.startTime) <= now && new Date(m.endTime) >= now
     );
-    const past = allMeetings.filter(m => new Date(m.endTime) < now);
+    const past = allMeetings.filter((m) => new Date(m.endTime) < now);
 
-    console.log(`✅ Upcoming: ${upcoming.length}, Ongoing: ${ongoing.length}, Past: ${past.length}`);
+    console.log(
+      `✅ Upcoming: ${upcoming.length}, Ongoing: ${ongoing.length}, Past: ${past.length}`
+    );
 
     res.json({ success: true, upcoming, ongoing, past });
   } catch (error) {
@@ -197,6 +216,7 @@ exports.getAllMeetings = async (req, res) => {
     res.status(500).json({ error: "Error fetching meetings" });
   }
 };
+
 
 
 
