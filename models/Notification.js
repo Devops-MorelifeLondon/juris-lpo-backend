@@ -15,19 +15,28 @@ const notificationSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: [
-      // Original task notifications
+      // 🧩 Task notifications
       'task_created',
-      'task_assigned', 
+      'task_assigned',
       'task_accepted',
       'task_completed',
       'task_overdue',
       'task_cancelled',
+
+      // 💬 Message notifications
       'message_received',
-      // ✅ NEW: Working log notifications
+
+      // 🕒 Work log notifications
       'work_log_added',
       'work_log_updated',
-      'work_log_deleted'
+      'work_log_deleted',
+
+      // 📅 Meeting notifications
+      'meeting_scheduled',
+      'meeting_updated',
+      'meeting_cancelled'
     ],
+
     required: true
   },
   // ✅ Simple reference to the main item

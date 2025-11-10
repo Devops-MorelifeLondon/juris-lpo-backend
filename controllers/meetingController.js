@@ -5,6 +5,7 @@ const Attorney = require("../models/Attorney");
 const Paralegal = require("../models/Paralegal");
 const GoogleAuth = require("../models/GoogleAuth");
 const { default: mongoose } = require("mongoose");
+const Notification = require("../models/Notification");
 
 // STEP 1: Get Google Auth URL (only works for logged-in user)
 exports.getGoogleAuthUrl = (req, res) => {
@@ -161,6 +162,43 @@ exports.scheduleMeeting = async (req, res) => {
 
     await meeting.save();
     console.log("✅ Google Calendar event created:", meetLink);
+
+    // ==========================
+// 🔔 Create Notifications
+// ==========================
+try {
+  // Notification for the participant
+  if (participant) {
+    await Notification.create({
+      recipient: participant._id,
+      recipientModel: creatorType === "Attorney" ? "Paralegal" : "Attorney",
+      type: "meeting_scheduled",
+      title: "New Meeting Scheduled",
+      message: `${user.fullName || user.firstName + " " + user.lastName} scheduled a meeting with you titled "${title}"`,
+      details: {
+        action: "meeting_created",
+        userName: user.fullName || user.firstName + " " + user.lastName,
+      },
+    });
+  }
+
+  // Notification for the creator
+  await Notification.create({
+    recipient: user._id,
+    recipientModel: creatorType,
+    type: "meeting_scheduled",
+    title: "Meeting Created Successfully",
+    message: `You scheduled a meeting with ${participant?.fullName || participant?.firstName + " " + participant?.lastName}`,
+    details: {
+      action: "meeting_created",
+      userName: user.fullName || user.firstName + " " + user.lastName,
+    },
+  });
+
+  console.log("✅ Notifications sent to both creator and participant");
+} catch (notifError) {
+  console.error("❌ Notification creation error:", notifError.message);
+}
 
     res.json({ success: true, meetLink });
   } catch (error) {
