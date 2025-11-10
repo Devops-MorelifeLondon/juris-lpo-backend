@@ -538,3 +538,74 @@ exports.resetPassword = async (req, res) => {
 };
 
 
+// ==========================
+// 📊 Paralegal Dashboard Info Controller
+// ==========================
+const Task = require("../models/Task");
+
+exports.getDashboardInfo = async (req, res) => {
+  try {
+    const attorneyId = req.user._id; // assuming 'protect' adds this field
+    console.log("Getdash user" , req.user);
+
+    // 1️⃣ Fetch assigned paralegals and their tasks
+    const tasks = await Task.find({ assignedBy: attorneyId })
+      .populate("assignedTo", "firstName lastName avatar practiceAreas specializations availability")
+      .lean();
+      console.log(tasks);
+
+    const assignedParalegalsMap = {};
+
+    for (const task of tasks) {
+      if (!task.assignedTo) continue;
+      const p = task.assignedTo;
+
+      if (!assignedParalegalsMap[p._id]) {
+        assignedParalegalsMap[p._id] = {
+          id: p._id,
+          name: `${p.firstName} ${p.lastName}`,
+          avatar: p.avatar,
+          expertise: p.practiceAreas || [],
+          training: p.specializations || [],
+          tasks: [],
+        };
+      }
+
+      const progress =
+        task.status === "Completed" ? 100 :
+        task.status === "In Progress" ? 70 :
+        task.status === "To do" ? 20 : 0;
+
+      assignedParalegalsMap[p._id].tasks.push({
+        id: task._id,
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        progress,
+        comments: task.comments || [],
+      });
+    }
+
+    const assignedParalegals = Object.values(assignedParalegalsMap);
+
+    // 2️⃣ Fetch available paralegals
+    const availableParalegals = await Paralegal.find({
+      availability: { $in: ["Available Now", "Available Soon"] },
+      isActive: true,
+    })
+      .select("firstName lastName avatar practiceAreas specializations availability")
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      assignedParalegals,
+      availableParalegals,
+    });
+  } catch (error) {
+    console.error("Dashboard Info Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load dashboard information",
+    });
+  }
+};

@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const paralegalController = require('../controllers/paralegalController');
-const { protect } = require('../middleware/paralegalauth');
+const { protect } = require('../middleware/auth');
 
 
 // POST /api/paralegals - Create a new paralegal
@@ -18,6 +18,9 @@ router.post("/forgot-password", paralegalController.forgotPassword);
 router.post("/reset-password/:token", paralegalController.resetPassword);
 
 router.use(protect);
+// Get Dashboard Info (Dynamic Paralegal & Task Data)
+router.get('/dashboard/info', paralegalController.getDashboardInfo);
+
 router.get('/singleparalegal', paralegalController.getParalegalById);
 router.route('/availableStatus')
   .get(paralegalController.availableStatus)
