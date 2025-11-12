@@ -50,6 +50,7 @@ app.use('/api/tasks', require('./routes/taskRoutes'));
 app.use('/api/paralegals', require('./routes/paralegal.auth.routes'));
 app.use('/api/notifications', require('./routes/notificationsRoutes'));
 app.use('/api/tasklogs', require('./routes/taskLogs.routes'))
+app.use('/api/training', require('./routes/trainingRoutes'));
 // Routes
 app.use('/api/chat', chatRoutes);
 app.use('/api', meetingRoutes);
