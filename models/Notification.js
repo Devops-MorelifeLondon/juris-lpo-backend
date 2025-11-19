@@ -22,6 +22,9 @@ const notificationSchema = new mongoose.Schema({
       'task_completed',
       'task_overdue',
       'task_cancelled',
+      'task_declined',
+
+      'document_assigned',
 
       // 💬 Message notifications
       'message_received',

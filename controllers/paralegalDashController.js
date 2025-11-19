@@ -469,6 +469,8 @@ exports.declineTask = async (req, res) => {
     const { taskId } = req.params;
     const { reason } = req.body;
     const paralegalId = req.user._id;
+    console.log(req.params);
+    console.log(req.body);
 
     // Get paralegal details for domain verification
     const paralegal = await Paralegal.findById(paralegalId).select('practiceAreas specializations firstName lastName');
@@ -483,7 +485,6 @@ exports.declineTask = async (req, res) => {
     // Find the task
     const task = await Task.findOne({
       _id: taskId,
-      domain: { $in: allowedDomains },
       status: 'Pending Assignment',
       assignedTo: { $exists: false }
     })
