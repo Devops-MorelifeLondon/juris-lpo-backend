@@ -1,4 +1,3 @@
-// models/Notification.js - Simple update
 const mongoose = require('mongoose');
 
 const notificationSchema = new mongoose.Schema({
@@ -15,43 +14,31 @@ const notificationSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: [
-      // 🧩 Task notifications
-      'task_created',
-      'task_assigned',
-      'task_accepted',
-      'task_completed',
-      'task_overdue',
-      'task_cancelled',
-      'task_declined',
-
+      'task_created', 'task_assigned', 'task_accepted', 'task_completed',
+      'task_overdue', 'task_cancelled', 'task_declined',
       'document_assigned',
-
-      // 💬 Message notifications
       'message_received',
-
-      // 🕒 Work log notifications
-      'work_log_added',
-      'work_log_updated',
-      'work_log_deleted',
-
-      // 📅 Meeting notifications
-      'meeting_scheduled',
-      'meeting_updated',
-      'meeting_cancelled'
+      'work_log_added', 'work_log_updated', 'work_log_deleted',
+      'meeting_scheduled', 'meeting_updated', 'meeting_cancelled' // ✅ Meeting types
     ],
-
     required: true
   },
-  // ✅ Simple reference to the main item
+  // ✅ EXISTING FIELDS
   task: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Task',
-    required: false  // All notifications relate to a task
+    required: false
   },
   taskLog: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'TaskLog',
-    required: false  // Only for log-specific notifications
+    required: false
+  },
+  // ✅ NEW FIELD (Add this to link notifications to meetings)
+  meeting: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Meeting',
+    required: false 
   },
   title: {
     type: String,
@@ -63,7 +50,6 @@ const notificationSchema = new mongoose.Schema({
     required: true,
     maxlength: 500
   },
-  // ✅ Simple extra info
   details: {
     hours: Number,
     userName: String,
@@ -78,9 +64,10 @@ const notificationSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Simple indexes
+// Indexes
 notificationSchema.index({ recipient: 1, createdAt: -1 });
 notificationSchema.index({ task: 1, createdAt: -1 });
+notificationSchema.index({ meeting: 1, createdAt: -1 }); // Index for meetings
 notificationSchema.index({ isRead: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

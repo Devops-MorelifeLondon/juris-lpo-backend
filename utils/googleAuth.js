@@ -1,27 +1,26 @@
+// utils/googleAuth.js
 const { google } = require("googleapis");
-require("dotenv").config(); // ✅ load .env variables
+require("dotenv").config();
 
-// ✅ Create OAuth2 client with credentials from .env
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
   process.env.GOOGLE_REDIRECT_URI
 );
 
-const getAuthUrl = () => {
+// ✅ Update this function to accept 'state'
+const getAuthUrl = (state) => {
   const scopes = [
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/userinfo.email",
   ];
 
-  const url = oauth2Client.generateAuthUrl({
+  return oauth2Client.generateAuthUrl({
     access_type: "offline",
-    prompt: "consent",
+    prompt: "consent", // This ensures you get the refresh token
     scope: scopes,
+    state: state,      // Pass the JWT token here
   });
-
-  console.log("🔗 Google Auth URL generated:", url); // ✅ Debug line
-  return url;
 };
 
 module.exports = { oauth2Client, getAuthUrl };
