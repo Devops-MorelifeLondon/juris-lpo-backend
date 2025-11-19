@@ -180,7 +180,15 @@ exports.scheduleMeeting = async (req, res) => {
       participantType,
       creatorEmail: user.email,
       participantEmail: participant?.email,
-      creatorName: user.fullName || `${user.firstName} ${user.lastName}`,
+     creatorName:
+  user.fullName ||
+  user.firstName && user.lastName
+    ? `${user.firstName} ${user.lastName}`
+    : user.firstName ||
+      user.lastName ||
+      user.email?.split("@")[0] ||
+      "User",
+
       participantName: participant?.fullName || `${participant.firstName} ${participant.lastName}`,
     });
 
@@ -194,7 +202,7 @@ exports.scheduleMeeting = async (req, res) => {
         type: 'meeting_scheduled',
         meeting: meeting._id, // Link to the meeting we just created
         title: "📅 New Meeting Scheduled",
-        message: `${meeting.creatorName} scheduled a meeting with you: "${title}"`,
+        message: `${participant.fullName || participant.firstName} scheduled a meeting with you: "${title}"`,
         details: {
           userName: meeting.creatorName,
           action: "scheduled"
