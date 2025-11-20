@@ -302,29 +302,29 @@ exports.googlelogin = async (req, res) => {
     // Check if attorney already exists
     let paralegal = await Paralegal.findOne({ email });
 
-    // if (!paralegal) {
-    //   // Create new attorney
-    //   const verificationToken = crypto.randomBytes(32).toString("hex");
-    //   paralegal = await Paralegal.create({
-    //     firstName,
-    //     lastName,
-    //     email,
-    //     avatar: picture
-    //   });
+    if (!paralegal) {
+      // Create new attorney
+      const verificationToken = crypto.randomBytes(32).toString("hex");
+      paralegal = await Paralegal.create({
+        firstName,
+        lastName,
+        email,
+        avatar: picture
+      });
 
-    //   // Send verification email
-    //   const verificationUrl = `${process.env.FRONTEND_URL}/paralegal/verify-email/${verificationToken}`;
-    //   try {
-    //     await sendBrevoEmailApi({
-    //       to_email: { email, name: fullName },
-    //       email_subject: "Verify Your Juris-LPO Paralegal Account",
-    //       htmlContent: emailTemplates.attorneyVerificationTemplate(fullName, verificationUrl)
-    //     });
-    //     console.log("📧 Verification email sent to:", email);
-    //   } catch (emailError) {
-    //     console.error("❌ Email sending failed:", emailError.message);
-    //   }
-    // }
+      // Send verification email
+      const verificationUrl = `${process.env.FRONTEND_URL}/paralegal/verify-email/${verificationToken}`;
+      try {
+        await sendBrevoEmailApi({
+          to_email: { email, name: fullName },
+          email_subject: "Verify Your Juris-LPO Paralegal Account",
+          htmlContent: emailTemplates.attorneyVerificationTemplate(fullName, verificationUrl)
+        });
+        console.log("📧 Verification email sent to:", email);
+      } catch (emailError) {
+        console.error("❌ Email sending failed:", emailError.message);
+      }
+    }
 
     // Send JWT token to frontend
     sendTokenResponse(paralegal, 200, res);
