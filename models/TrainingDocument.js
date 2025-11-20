@@ -1,5 +1,21 @@
 const mongoose = require('mongoose');
 
+const fileSchema = new mongoose.Schema({
+  filePath: { type: String, required: true },
+  s3Url: { type: String },
+  originalFileName: { type: String, required: true },
+  fileType: { type: String },
+  fileSize: { type: Number }
+});
+
+const videoSchema = new mongoose.Schema({
+  filePath: { type: String, required: true },
+  s3Url: { type: String },
+  originalFileName: { type: String, required: true },
+  fileType: { type: String },
+  fileSize: { type: Number },
+});
+
 const trainingDocumentSchema = new mongoose.Schema({
   documentName: { type: String, required: true },
 
@@ -14,10 +30,10 @@ const trainingDocumentSchema = new mongoose.Schema({
     required: true,
     enum: ['AI', 'Paralegal', 'Both'],
   },
-paralegalAssignedTo: [
-  { type: mongoose.Schema.Types.ObjectId, ref: 'Paralegal' }
-],
 
+  paralegalAssignedTo: [
+    { type: mongoose.Schema.Types.ObjectId, ref: 'Paralegal' }
+  ],
 
   priority: {
     type: String,
@@ -28,11 +44,11 @@ paralegalAssignedTo: [
 
   description: { type: String },
 
-  filePath: { type: String, required: true },   // S3 key
-  s3Url: { type: String },                      // Optional
-  originalFileName: { type: String, required: true },
-  fileType: { type: String },
-  fileSize: { type: Number },
+  // 📄 Multiple Documents
+  files: [fileSchema],
+
+  // 🎥 Multiple Videos
+  videos: [videoSchema],
 
   uploadedBy: { type: String },
   uploadedById: { type: mongoose.Schema.Types.ObjectId },
@@ -43,8 +59,7 @@ paralegalAssignedTo: [
     enum: ['Pending Review', 'In Training', 'Completed'],
     default: 'Pending Review',
   },
-}, {
-  timestamps: true,
-});
+
+}, { timestamps: true });
 
 module.exports = mongoose.model('TrainingDocument', trainingDocumentSchema);
