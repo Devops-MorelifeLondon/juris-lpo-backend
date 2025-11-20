@@ -202,7 +202,7 @@ exports.scheduleMeeting = async (req, res) => {
         type: 'meeting_scheduled',
         meeting: meeting._id, // Link to the meeting we just created
         title: "📅 New Meeting Scheduled",
-        message: `${participant.fullName || participant.firstName} scheduled a meeting with you: "${title}"`,
+        message: `${user.fullName || user.firstName} scheduled a meeting with you: "${title}"`,
         details: {
           userName: meeting.creatorName,
           action: "scheduled"
