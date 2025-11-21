@@ -9,9 +9,11 @@ const fileSchema = new mongoose.Schema({
 });
 
 const videoSchema = new mongoose.Schema({
-  filePath: { type: String, required: true },
+  isUrl: { type: Boolean, default: false },  // true => external URL
+  url: { type: String },                     // external link (YouTube/Vimeo/Drive)
+  filePath: { type: String },                // S3 key for uploaded video
   s3Url: { type: String },
-  originalFileName: { type: String, required: true },
+  originalFileName: { type: String },
   fileType: { type: String },
   fileSize: { type: Number },
 });
@@ -47,7 +49,7 @@ const trainingDocumentSchema = new mongoose.Schema({
   // 📄 Multiple Documents
   files: [fileSchema],
 
-  // 🎥 Multiple Videos
+  // 🎥 Multiple Videos (either URLs or uploaded files)
   videos: [videoSchema],
 
   uploadedBy: { type: String },

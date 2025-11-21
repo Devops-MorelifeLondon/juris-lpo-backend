@@ -4,14 +4,12 @@ const s3 = require('../config/s3');
 const { PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
-
 // =========================================================
 // 1️⃣ Generate File Upload URL  (documents only)
 // =========================================================
 exports.generateFileUploadUrl = async (req, res) => {
   try {
     const { fileName, fileType } = req.body;
-
     const key = `training/docs/${Date.now()}-${fileName}`;
 
     const command = new PutObjectCommand({
@@ -23,13 +21,11 @@ exports.generateFileUploadUrl = async (req, res) => {
     const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
 
     res.json({ success: true, uploadUrl, key });
-
   } catch (err) {
     console.error("File Upload URL Error:", err);
     res.status(500).json({ success: false, message: "Could not generate upload URL" });
   }
 };
-
 
 // =========================================================
 // 2️⃣ Generate Video Upload URL
@@ -38,8 +34,8 @@ exports.generateVideoUploadUrl = async (req, res) => {
   try {
     const { fileName, fileType, fileSize } = req.body;
 
-    // Video size restriction (100MB recommended)
-    if (fileSize > 1100 * 1024 * 1024) {
+    // Optional: adjust max size limit
+    if (fileSize && fileSize > 1100 * 1024 * 1024) {
       return res.status(400).json({
         success: false,
         message: "Max video size allowed is 1100MB"
@@ -51,19 +47,17 @@ exports.generateVideoUploadUrl = async (req, res) => {
     const command = new PutObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: key,
-      ContentType: fileType,
+      ContentType: fileType || "video/mp4",
     });
 
     const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
 
     res.json({ success: true, uploadUrl, key });
-
   } catch (err) {
     console.error("Video Upload URL Error:", err);
     res.status(500).json({ success: false, message: "Could not generate upload URL" });
   }
 };
-
 
 // =========================================================
 // 3️⃣ Save Training Entry (files + videos)
@@ -87,15 +81,34 @@ exports.saveMetadata = async (req, res) => {
         ? req.user.fullName
         : `${req.user.firstName} ${req.user.lastName}`;
 
+    // Normalize videos: expected items are either { isUrl: true, url } or object with filePath etc.
+    const normalizedVideos = Array.isArray(videos) ? videos.map(v => {
+      if (v && v.isUrl) {
+        return {
+          isUrl: true,
+          url: v.url
+        };
+      }
+      // assume already contains fields from upload step
+      return {
+        isUrl: false,
+        filePath: v.filePath,
+        s3Url: v.s3Url,
+        originalFileName: v.originalFileName,
+        fileType: v.fileType,
+        fileSize: v.fileSize
+      };
+    }) : [];
+
     const newDoc = new TrainingDocument({
       documentName,
       documentType,
       assignedTo,
       priority,
       description,
-      files,
-      videos,
-      paralegalAssignedTo,
+      files: Array.isArray(files) ? files : [],
+      videos: normalizedVideos,
+      paralegalAssignedTo: Array.isArray(paralegalAssignedTo) ? paralegalAssignedTo : [],
       uploadedBy: uploadedByName,
       uploadedById: req.user._id,
       uploadedByModel: role === "attorney" ? "Attorney" : "Paralegal",
@@ -120,13 +133,11 @@ exports.saveMetadata = async (req, res) => {
     }
 
     res.json({ success: true, data: newDoc });
-
   } catch (err) {
     console.error("Metadata Save Error:", err);
     res.status(500).json({ success: false, message: "Could not save metadata" });
   }
 };
-
 
 // =========================================================
 // 4️⃣ Fetch History
@@ -134,7 +145,6 @@ exports.saveMetadata = async (req, res) => {
 exports.getUploadHistory = async (req, res) => {
   try {
     let query = {};
-
     if (req.user.role === 'attorney' || req.user.role === 'paralegal') {
       query.uploadedById = req.user._id;
     }
@@ -144,15 +154,14 @@ exports.getUploadHistory = async (req, res) => {
       .lean();
 
     res.json({ success: true, data: documents });
-
   } catch (err) {
+    console.error("Get History Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-
 // =========================================================
-// 5️⃣ Generate Download URL
+// 5️⃣ Generate Download (presigned) URL
 // =========================================================
 exports.getPresignedDownloadUrl = async (req, res) => {
   try {
@@ -166,8 +175,8 @@ exports.getPresignedDownloadUrl = async (req, res) => {
     const downloadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
 
     res.json({ success: true, url: downloadUrl });
-
   } catch (err) {
+    console.error("Presigned URL Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
