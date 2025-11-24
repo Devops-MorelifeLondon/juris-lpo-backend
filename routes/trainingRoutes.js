@@ -12,4 +12,7 @@ router.get('/history', protect, trainingController.getUploadHistory);
 
 router.get('/file-url', protect, trainingController.getPresignedDownloadUrl);
 
+router.get("/paralegal-assigned", protect, trainingController.getAssignedDocuments);
+
+
 module.exports = router;

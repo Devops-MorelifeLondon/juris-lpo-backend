@@ -165,7 +165,10 @@ exports.getUploadHistory = async (req, res) => {
 // =========================================================
 exports.getPresignedDownloadUrl = async (req, res) => {
   try {
-    const { key } = req.query;
+    const key = req.query.key || req.query.filePath;
+    if (!key) {
+      return res.status(400).json({ success: false, message: "File key is required" });
+    }
 
     const command = new GetObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
@@ -178,5 +181,22 @@ exports.getPresignedDownloadUrl = async (req, res) => {
   } catch (err) {
     console.error("Presigned URL Error:", err);
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+exports.getAssignedDocuments = async (req, res) => {
+  try {
+    const paralegalId = req.user._id;
+    console.log("Fetching documents for paralegal ID:", paralegalId);
+
+    const documents = await TrainingDocument.find({
+      paralegalAssignedTo: paralegalId
+    });
+    console.log("Assigned documents found:", documents.length);
+
+    res.status(200).json({ documents });
+  } catch (err) {
+    res.status(500).json({ message: "Error loading assigned documents" });
   }
 };

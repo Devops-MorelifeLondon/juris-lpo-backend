@@ -13,7 +13,7 @@ exports.protect = async (req, res, next) => {
       token = req.cookies.token;
     }
 
-    console.log("Token:", token);
+
 
     // 2. Validate token existence
     if (!token || token === "undefined" || token === "null") {
