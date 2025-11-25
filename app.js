@@ -8,6 +8,8 @@ const { errorHandler } = require('./middleware/errorHandler');
 const notFound = require('./middleware/notFound');
 const chatRoutes = require('./routes/chatRoutes');
 const meetingRoutes = require('./routes/meetingRoutes');
+const trainingProgressRoutes = require("./routes/trainingProgressRoutes");
+const trainingCommentRoutes = require("./routes/trainingCommentRoutes");
 
 
 
@@ -54,6 +56,10 @@ app.use('/api/training', require('./routes/trainingRoutes'));
 // Routes
 app.use('/api/chat', chatRoutes);
 app.use('/api', meetingRoutes);
+
+
+app.use("/api/training/progress", trainingProgressRoutes);
+app.use("/api/training/comments", trainingCommentRoutes);
 
 
 // ✅ 7. 404 + error handlers

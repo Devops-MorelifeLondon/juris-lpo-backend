@@ -1,23 +1,71 @@
 const mongoose = require('mongoose');
 
+/* ===========================
+   REPLY (Attorney or Paralegal)
+=========================== */
+const replySchema = new mongoose.Schema({
+  repliedById: { type: mongoose.Schema.Types.ObjectId, required: true },
+  repliedByRole: { type: String, enum: ["Paralegal", "Attorney"], required: true },
+  message: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+/* ===========================
+   COMMENT (Paralegal only)
+=========================== */
+const commentSchema = new mongoose.Schema({
+  message: { type: String, required: true },
+  createdById: { type: mongoose.Schema.Types.ObjectId, required: true },  // Paralegal
+  createdAt: { type: Date, default: Date.now },
+
+  replies: [replySchema] // Replies from attorneys or paralegal
+});
+
+/* ===========================
+   DOCUMENT FILE WITH PROGRESS
+=========================== */
 const fileSchema = new mongoose.Schema({
   filePath: { type: String, required: true },
   s3Url: { type: String },
   originalFileName: { type: String, required: true },
   fileType: { type: String },
-  fileSize: { type: Number }
+  fileSize: { type: Number },
+
+  // Only one paralegal — single progress field
+  progress: {
+    percentageRead: { type: Number, default: 0 },  // 0–100
+    lastUpdated: { type: Date, default: Date.now }
+  },
+
+  // Comments for this document file
+  comments: [commentSchema]
 });
 
+/* ===========================
+   VIDEO WITH PROGRESS
+=========================== */
 const videoSchema = new mongoose.Schema({
-  isUrl: { type: Boolean, default: false },  // true => external URL
-  url: { type: String },                     // external link (YouTube/Vimeo/Drive)
-  filePath: { type: String },                // S3 key for uploaded video
+  isUrl: { type: Boolean, default: false },
+  url: { type: String },
+  filePath: { type: String },
   s3Url: { type: String },
   originalFileName: { type: String },
   fileType: { type: String },
   fileSize: { type: Number },
+
+  // Only one paralegal — single progress field
+  progress: {
+    percentageWatched: { type: Number, default: 0 }, // 0–100
+    lastUpdated: { type: Date, default: Date.now }
+  },
+
+  // Comments for this video
+  comments: [commentSchema]
 });
 
+/* ===========================
+   MAIN TRAINING DOCUMENT
+=========================== */
 const trainingDocumentSchema = new mongoose.Schema({
   documentName: { type: String, required: true },
 
@@ -33,9 +81,11 @@ const trainingDocumentSchema = new mongoose.Schema({
     enum: ['AI', 'Paralegal', 'Both'],
   },
 
-  paralegalAssignedTo: [
-    { type: mongoose.Schema.Types.ObjectId, ref: 'Paralegal' }
-  ],
+  // One paralegal — no array
+  paralegalAssignedTo: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Paralegal'
+  },
 
   priority: {
     type: String,
@@ -46,10 +96,8 @@ const trainingDocumentSchema = new mongoose.Schema({
 
   description: { type: String },
 
-  // 📄 Multiple Documents
+  // Individual files + videos with their progress + comments
   files: [fileSchema],
-
-  // 🎥 Multiple Videos (either URLs or uploaded files)
   videos: [videoSchema],
 
   uploadedBy: { type: String },
