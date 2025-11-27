@@ -1,5 +1,7 @@
 const TrainingDocument = require('../models/TrainingDocument');
 const Notification = require('../models/Notification');
+const Attorney = require('../models/Attorney'); 
+const Paralegal = require('../models/Paralegal');
 const s3 = require('../config/s3');
 const { PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
@@ -34,7 +36,6 @@ exports.generateVideoUploadUrl = async (req, res) => {
   try {
     const { fileName, fileType, fileSize } = req.body;
 
-    // Optional: adjust max size limit
     if (fileSize && fileSize > 1100 * 1024 * 1024) {
       return res.status(400).json({
         success: false,
@@ -72,7 +73,7 @@ exports.saveMetadata = async (req, res) => {
       description,
       files,
       videos,
-      paralegalAssignedTo,
+      assignedParalegals, // UPDATED FIELD
     } = req.body;
 
     const role = req.user.role;
@@ -81,24 +82,27 @@ exports.saveMetadata = async (req, res) => {
         ? req.user.fullName
         : `${req.user.firstName} ${req.user.lastName}`;
 
-    // Normalize videos: expected items are either { isUrl: true, url } or object with filePath etc.
-    const normalizedVideos = Array.isArray(videos) ? videos.map(v => {
-      if (v && v.isUrl) {
-        return {
-          isUrl: true,
-          url: v.url
-        };
-      }
-      // assume already contains fields from upload step
-      return {
-        isUrl: false,
-        filePath: v.filePath,
-        s3Url: v.s3Url,
-        originalFileName: v.originalFileName,
-        fileType: v.fileType,
-        fileSize: v.fileSize
-      };
-    }) : [];
+    // Normalize videos
+    const normalizedVideos = Array.isArray(videos)
+      ? videos.map((v) => {
+          if (v?.isUrl) {
+            return { isUrl: true, url: v.url };
+          }
+          return {
+            isUrl: false,
+            filePath: v.filePath,
+            s3Url: v.s3Url,
+            originalFileName: v.originalFileName,
+            fileType: v.fileType,
+            fileSize: v.fileSize,
+          };
+        })
+      : [];
+
+    // UPDATED: assignedParalegals is an array always
+    const processedParalegals = Array.isArray(assignedParalegals)
+      ? assignedParalegals
+      : [];
 
     const newDoc = new TrainingDocument({
       documentName,
@@ -108,25 +112,29 @@ exports.saveMetadata = async (req, res) => {
       description,
       files: Array.isArray(files) ? files : [],
       videos: normalizedVideos,
-      paralegalAssignedTo: Array.isArray(paralegalAssignedTo) ? paralegalAssignedTo : [],
+
+      // 🔥 UPDATED FIELD NAME
+      assignedParalegals: processedParalegals,
+
       uploadedBy: uploadedByName,
       uploadedById: req.user._id,
       uploadedByModel: role === "attorney" ? "Attorney" : "Paralegal",
     });
 
     await newDoc.save();
+    console.log(newDoc);
 
-    // Notifications
-    if (Array.isArray(paralegalAssignedTo) && paralegalAssignedTo.length > 0) {
+    // Send notifications
+    if (processedParalegals.length > 0) {
       await Promise.all(
-        paralegalAssignedTo.map((paralegalId) =>
+        processedParalegals.map((paralegalId) =>
           Notification.create({
             recipient: paralegalId,
             recipientModel: "Paralegal",
             type: "document_assigned",
             title: "New Training Document Assigned",
             message: `A new training document "${documentName}" has been assigned to you.`,
-            details: { action: "training_document", userName: uploadedByName }
+            details: { action: "training_document", userName: uploadedByName },
           })
         )
       );
@@ -145,13 +153,14 @@ exports.saveMetadata = async (req, res) => {
 exports.getUploadHistory = async (req, res) => {
   try {
     let query = {};
-    if (req.user.role === 'attorney' || req.user.role === 'paralegal') {
+    if (req.user.role === "attorney" || req.user.role === "paralegal") {
       query.uploadedById = req.user._id;
     }
 
     const documents = await TrainingDocument.find(query)
       .sort({ createdAt: -1 })
-      .lean();
+      .lean().populate("assignedParalegals", "firstName lastName")
+;
 
     res.json({ success: true, data: documents });
   } catch (err) {
@@ -172,7 +181,7 @@ exports.getPresignedDownloadUrl = async (req, res) => {
 
     const command = new GetObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key
+      Key: key,
     });
 
     const downloadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
@@ -184,19 +193,70 @@ exports.getPresignedDownloadUrl = async (req, res) => {
   }
 };
 
+// =========================================================
+// 6️⃣ Fetch Assigned Documents (Paralegal)
+// =========================================================
 
+// =========================================================
+// 6️⃣ Fetch Assigned Documents (Paralegal)
+// =========================================================
 exports.getAssignedDocuments = async (req, res) => {
   try {
     const paralegalId = req.user._id;
-    console.log("Fetching documents for paralegal ID:", paralegalId);
 
     const documents = await TrainingDocument.find({
-      paralegalAssignedTo: paralegalId
-    });
-    console.log("Assigned documents found:", documents.length);
+      assignedParalegals: paralegalId,
+    })
+      // Populate assigned paralegal list
+      .populate("assignedParalegals", "firstName lastName email")
+
+      // Populate progress (still uses ObjectId → Paralegal)
+      .populate("files.progress.paralegalId", "firstName lastName email")
+      .populate("videos.progress.paralegalId", "firstName lastName email")
+
+      // Sort recent first
+      .sort({ createdAt: -1 });
 
     res.status(200).json({ documents });
+
   } catch (err) {
+    console.error("Get Assigned Docs Error:", err);
     res.status(500).json({ message: "Error loading assigned documents" });
   }
 };
+
+
+
+// =========================================================
+// 7️⃣ Fetch Attorney Uploaded Documents
+// =========================================================
+exports.getAttorneyDocuments = async (req, res) => {
+  try {
+    const attorneyId = req.user._id;
+
+    const documents = await TrainingDocument.find({
+      uploadedById: attorneyId,
+    })
+      .sort({ createdAt: -1 })
+
+      // Assigned paralegals
+      .populate("assignedParalegals", "firstName lastName email")
+
+      // Progress population
+      .populate("files.progress.paralegalId", "firstName lastName email")
+      .populate("videos.progress.paralegalId", "firstName lastName email")
+
+      // Uploader user info
+      .populate({
+        path: "uploadedById",
+        select: "firstName lastName fullName email"
+      });
+
+    res.status(200).json({ documents });
+
+  } catch (err) {
+    console.error("Get Attorney Docs Error:", err);
+    res.status(500).json({ message: "Error loading attorney documents" });
+  }
+};
+

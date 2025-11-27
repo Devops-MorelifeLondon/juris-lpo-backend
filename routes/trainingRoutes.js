@@ -14,7 +14,8 @@ router.get('/file-url', protect, trainingController.getPresignedDownloadUrl);
 
 router.get("/paralegal-assigned", protect, trainingController.getAssignedDocuments);
 
-
+// NEW: For Attorneys to monitor progress
+router.get("/attorney-assigned", protect, trainingController.getAttorneyDocuments);
 
 
 module.exports = router;

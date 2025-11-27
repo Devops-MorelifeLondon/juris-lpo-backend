@@ -1,28 +1,54 @@
 const mongoose = require('mongoose');
+require('./Attorney');   // <-- IMPORTANT
+require('./Paralegal');  // <-- IMPORTANT
+
+
 
 /* ===========================
-   REPLY (Attorney or Paralegal)
+   REPLY SCHEMA (Simplified - Embed User Data)
 =========================== */
 const replySchema = new mongoose.Schema({
-  repliedById: { type: mongoose.Schema.Types.ObjectId, required: true },
-  repliedByRole: { type: String, enum: ["Paralegal", "Attorney"], required: true },
+  repliedBy: {  // Embed name and email directly
+    firstName: { type: String, required: false },
+    lastName: { type: String, required: false },
+    fullName: { type: String },
+    email: { type: String },
+    role: { type: String, enum: ["Paralegal", "Attorney"], required: true },  // Keep role for filtering
+    _id: { type: mongoose.Schema.Types.ObjectId, required: true }  // Keep ID for other uses
+  },
   message: { type: String, required: true },
   createdAt: { type: Date, default: Date.now }
 });
 
 /* ===========================
-   COMMENT (Paralegal only)
+   COMMENT SCHEMA (Simplified - Embed User Data)
 =========================== */
 const commentSchema = new mongoose.Schema({
   message: { type: String, required: true },
-  createdById: { type: mongoose.Schema.Types.ObjectId, required: true },  // Paralegal
+  createdBy: {  // Embed name and email directly
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
+    fullName: { type: String },
+    email: { type: String },
+    role: { type: String, enum: ['Attorney', 'Paralegal'], required: true },  // Keep role for filtering
+    _id: { type: mongoose.Schema.Types.ObjectId, required: true }  // Keep ID for other uses
+  },
   createdAt: { type: Date, default: Date.now },
+  replies: [replySchema]
+});
 
-  replies: [replySchema] // Replies from attorneys or paralegal
+
+/* ===========================
+   FILE PROGRESS PER PARALEGAL
+=========================== */
+const fileProgressSchema = new mongoose.Schema({
+  paralegalId: { type: mongoose.Schema.Types.ObjectId, ref: "Paralegal", required: true },
+  percentageRead: { type: Number, default: 0 },
+  lastUpdated: { type: Date, default: Date.now }
 });
 
 /* ===========================
-   DOCUMENT FILE WITH PROGRESS
+   FILE SCHEMA
 =========================== */
 const fileSchema = new mongoose.Schema({
   filePath: { type: String, required: true },
@@ -30,19 +56,21 @@ const fileSchema = new mongoose.Schema({
   originalFileName: { type: String, required: true },
   fileType: { type: String },
   fileSize: { type: Number },
-
-  // Only one paralegal — single progress field
-  progress: {
-    percentageRead: { type: Number, default: 0 },  // 0–100
-    lastUpdated: { type: Date, default: Date.now }
-  },
-
-  // Comments for this document file
+  progress: [fileProgressSchema],
   comments: [commentSchema]
 });
 
 /* ===========================
-   VIDEO WITH PROGRESS
+   VIDEO PROGRESS PER PARALEGAL
+=========================== */
+const videoProgressSchema = new mongoose.Schema({
+  paralegalId: { type: mongoose.Schema.Types.ObjectId, ref: "Paralegal", required: true },
+  percentageWatched: { type: Number, default: 0 },
+  lastUpdated: { type: Date, default: Date.now }
+});
+
+/* ===========================
+   VIDEO SCHEMA
 =========================== */
 const videoSchema = new mongoose.Schema({
   isUrl: { type: Boolean, default: false },
@@ -52,64 +80,48 @@ const videoSchema = new mongoose.Schema({
   originalFileName: { type: String },
   fileType: { type: String },
   fileSize: { type: Number },
-
-  // Only one paralegal — single progress field
-  progress: {
-    percentageWatched: { type: Number, default: 0 }, // 0–100
-    lastUpdated: { type: Date, default: Date.now }
-  },
-
-  // Comments for this video
+  progress: [videoProgressSchema],
   comments: [commentSchema]
 });
 
 /* ===========================
    MAIN TRAINING DOCUMENT
 =========================== */
-const trainingDocumentSchema = new mongoose.Schema({
-  documentName: { type: String, required: true },
-
-  documentType: {
-    type: String,
-    required: true,
-    enum: ['AI Draft', 'Paralegal Template', 'SOP', 'Research Material', 'Other'],
+const trainingDocumentSchema = new mongoose.Schema(
+  {
+    documentName: { type: String, required: true },
+    documentType: {
+      type: String,
+      required: true,
+      enum: ['AI Draft', 'Paralegal Template', 'SOP', 'Research Material', 'Other'],
+    },
+    assignedTo: {
+      type: String,
+      required: true,
+      enum: ['AI', 'Paralegal', 'Both'],
+    },
+    assignedParalegals: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "Paralegal" }
+    ],
+    priority: {
+      type: String,
+      required: true,
+      enum: ['Low', 'Medium', 'High'],
+      default: 'Low',
+    },
+    description: { type: String },
+    files: [fileSchema],
+    videos: [videoSchema],
+    uploadedBy: { type: String },
+    uploadedById: { type: mongoose.Schema.Types.ObjectId, refPath: 'uploadedByModel' },
+    uploadedByModel: { type: String, enum: ['Attorney', 'Paralegal'] },
+    status: {
+      type: String,
+      enum: ['Pending Review', 'In Training', 'Completed'],
+      default: 'Pending Review',
+    }
   },
+  { timestamps: true }
+);
 
-  assignedTo: {
-    type: String,
-    required: true,
-    enum: ['AI', 'Paralegal', 'Both'],
-  },
-
-  // One paralegal — no array
-  paralegalAssignedTo: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Paralegal'
-  },
-
-  priority: {
-    type: String,
-    required: true,
-    enum: ['Low', 'Medium', 'High'],
-    default: 'Low',
-  },
-
-  description: { type: String },
-
-  // Individual files + videos with their progress + comments
-  files: [fileSchema],
-  videos: [videoSchema],
-
-  uploadedBy: { type: String },
-  uploadedById: { type: mongoose.Schema.Types.ObjectId },
-  uploadedByModel: { type: String },
-
-  status: {
-    type: String,
-    enum: ['Pending Review', 'In Training', 'Completed'],
-    default: 'Pending Review',
-  },
-
-}, { timestamps: true });
-
-module.exports = mongoose.model('TrainingDocument', trainingDocumentSchema);
+module.exports = mongoose.model("TrainingDocument", trainingDocumentSchema);
