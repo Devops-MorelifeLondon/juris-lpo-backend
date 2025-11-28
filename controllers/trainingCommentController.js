@@ -28,13 +28,13 @@ exports.addDocumentComment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Message is required" });
     }
 
-    const doc = await TrainingDocument.findById(documentId).populate("assignedParalegals").populate("attorney");
+    const doc = await TrainingDocument.findById(documentId)
+      .populate("assignedParalegals");
 
     if (!doc) {
       return res.status(404).json({ success: false, message: "Document not found" });
     }
 
-    // Build user data
     const user = {
       firstName: req.user.firstName || "",
       lastName: req.user.lastName || "",
@@ -65,26 +65,26 @@ exports.addDocumentComment = async (req, res) => {
     // 🔔 NOTIFICATION LOGIC
     // =======================
 
-    if (req.user.role === "paralegal") {
-      // Notify attorney
-      if (doc.attorney) {
+    if (user.role === "Paralegal") {
+      // Notify the uploader only if uploader is an attorney
+      if (doc.uploadedByModel === "Attorney") {
         await createNotification({
-          recipient: doc.attorney._id,
+          recipient: doc.uploadedById,
           recipientModel: "Attorney",
           type: "message_received",
-          title: "New Comment on Document",
-          message: `${user.fullName} commented on ${doc.title || "a document"}.`
+          title: "New Comment Added",
+          message: `${user.fullName} commented on ${doc.documentName}.`
         });
       }
-    } else if (req.user.role === "attorney") {
+    } else if (user.role === "Attorney") {
       // Notify all assigned paralegals
       for (let para of doc.assignedParalegals) {
         await createNotification({
           recipient: para._id,
           recipientModel: "Paralegal",
           type: "message_received",
-          title: "New Comment on Document",
-          message: `${user.fullName} commented on ${doc.title || "a document"}.`
+          title: "New Comment Added",
+          message: `${user.fullName} commented on ${doc.documentName}.`
         });
       }
     }
@@ -96,6 +96,7 @@ exports.addDocumentComment = async (req, res) => {
     res.status(500).json({ success: false, message: "Could not add comment" });
   }
 };
+
 
 
 
@@ -111,7 +112,8 @@ exports.addVideoComment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Message is required" });
     }
 
-    const doc = await TrainingDocument.findById(documentId).populate("assignedParalegals").populate("attorney");
+    const doc = await TrainingDocument.findById(documentId)
+      .populate("assignedParalegals");
 
     if (!doc) {
       return res.status(404).json({ success: false, message: "Document not found" });
@@ -143,15 +145,15 @@ exports.addVideoComment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Document or video not found" });
     }
 
-    // 🔔 Notification
-    if (req.user.role === "paralegal") {
-      if (doc.attorney) {
+    // 🔔 NOTIFICATION LOGIC
+    if (user.role === "Paralegal") {
+      if (doc.uploadedByModel === "Attorney") {
         await createNotification({
-          recipient: doc.attorney._id,
+          recipient: doc.uploadedById,
           recipientModel: "Attorney",
           type: "message_received",
           title: "New Video Comment",
-          message: `${user.fullName} commented on a video in ${doc.title}.`
+          message: `${user.fullName} commented on a video in ${doc.documentName}.`
         });
       }
     } else {
@@ -161,7 +163,7 @@ exports.addVideoComment = async (req, res) => {
           recipientModel: "Paralegal",
           type: "message_received",
           title: "New Video Comment",
-          message: `${user.fullName} commented on a video in ${doc.title}.`
+          message: `${user.fullName} commented on a video in ${doc.documentName}.`
         });
       }
     }
@@ -173,6 +175,7 @@ exports.addVideoComment = async (req, res) => {
     res.status(500).json({ success: false, message: "Could not add comment" });
   }
 };
+
 
 
 
@@ -188,7 +191,8 @@ exports.replyToDocumentComment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Reply message is required" });
     }
 
-    const doc = await TrainingDocument.findById(documentId).populate("assignedParalegals").populate("attorney");
+    const doc = await TrainingDocument.findById(documentId)
+      .populate("assignedParalegals");
 
     const repliedBy = {
       firstName: req.user.firstName || "",
@@ -221,11 +225,11 @@ exports.replyToDocumentComment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Document, file, or comment not found" });
     }
 
-    // 🔔 Notification logic
-    if (req.user.role === "paralegal") {
-      if (doc.attorney) {
+    // 🔔 Notification
+    if (repliedBy.role === "Paralegal") {
+      if (doc.uploadedByModel === "Attorney") {
         await createNotification({
-          recipient: doc.attorney._id,
+          recipient: doc.uploadedById,
           recipientModel: "Attorney",
           type: "message_received",
           title: "New Reply on Document",
@@ -254,6 +258,7 @@ exports.replyToDocumentComment = async (req, res) => {
 
 
 
+
 // ======================================================
 // Reply to Video Comment (Attorney / Paralegal)
 // ======================================================
@@ -266,7 +271,12 @@ exports.replyToVideoComment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Reply message is required" });
     }
 
-    const doc = await TrainingDocument.findById(documentId).populate("assignedParalegals").populate("attorney");
+    const doc = await TrainingDocument.findById(documentId)
+      .populate("assignedParalegals");
+
+    if (!doc) {
+      return res.status(404).json({ success: false, message: "Document not found" });
+    }
 
     const repliedBy = {
       firstName: req.user.firstName || "",
@@ -299,25 +309,30 @@ exports.replyToVideoComment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Document, video, or comment not found" });
     }
 
-    // 🔔 Notification
-    if (req.user.role === "paralegal") {
-      if (doc.attorney) {
+    // =======================================
+    // 🔔 NEW NOTIFICATION LOGIC (Corrected)
+    // =======================================
+
+    if (repliedBy.role === "Paralegal") {
+      // Notify uploader ONLY if uploader is an Attorney
+      if (doc.uploadedByModel === "Attorney") {
         await createNotification({
-          recipient: doc.attorney._id,
+          recipient: doc.uploadedById,
           recipientModel: "Attorney",
           type: "message_received",
           title: "New Reply on Video",
-          message: `${repliedBy.fullName} replied on a video comment.`
+          message: `${repliedBy.fullName} replied to a video comment in ${doc.documentName}.`
         });
       }
     } else {
+      // Attorney → notify all assigned paralegals
       for (let para of doc.assignedParalegals) {
         await createNotification({
           recipient: para._id,
           recipientModel: "Paralegal",
           type: "message_received",
           title: "New Reply on Video",
-          message: `${repliedBy.fullName} replied on a video comment.`
+          message: `${repliedBy.fullName} replied to a video comment in ${doc.documentName}.`
         });
       }
     }
