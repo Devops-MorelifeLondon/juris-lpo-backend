@@ -6,6 +6,10 @@ const s3 = require('../config/s3');
 const { PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
+
+
+
+
 // =========================================================
 // 1️⃣ Generate File Upload URL  (documents only)
 // =========================================================
@@ -193,9 +197,6 @@ exports.getPresignedDownloadUrl = async (req, res) => {
   }
 };
 
-// =========================================================
-// 6️⃣ Fetch Assigned Documents (Paralegal)
-// =========================================================
 
 // =========================================================
 // 6️⃣ Fetch Assigned Documents (Paralegal)

@@ -1,4 +1,20 @@
 const TrainingDocument = require("../models/TrainingDocument");
+const Notification = require("../models/Notification");
+
+// Helper: Create Notification
+async function createNotification({ recipient, recipientModel, type, message, title }) {
+  try {
+    await Notification.create({
+      recipient,
+      recipientModel,
+      type,
+      title,
+      message
+    });
+  } catch (err) {
+    console.error("Notification Create Error:", err);
+  }
+}
 
 // ======================================================
 // Add Comment to a Document File
@@ -12,7 +28,13 @@ exports.addDocumentComment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Message is required" });
     }
 
-    // Build embedded user object
+    const doc = await TrainingDocument.findById(documentId).populate("assignedParalegals").populate("attorney");
+
+    if (!doc) {
+      return res.status(404).json({ success: false, message: "Document not found" });
+    }
+
+    // Build user data
     const user = {
       firstName: req.user.firstName || "",
       lastName: req.user.lastName || "",
@@ -39,6 +61,34 @@ exports.addDocumentComment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Document or file not found" });
     }
 
+    // =======================
+    // 🔔 NOTIFICATION LOGIC
+    // =======================
+
+    if (req.user.role === "paralegal") {
+      // Notify attorney
+      if (doc.attorney) {
+        await createNotification({
+          recipient: doc.attorney._id,
+          recipientModel: "Attorney",
+          type: "message_received",
+          title: "New Comment on Document",
+          message: `${user.fullName} commented on ${doc.title || "a document"}.`
+        });
+      }
+    } else if (req.user.role === "attorney") {
+      // Notify all assigned paralegals
+      for (let para of doc.assignedParalegals) {
+        await createNotification({
+          recipient: para._id,
+          recipientModel: "Paralegal",
+          type: "message_received",
+          title: "New Comment on Document",
+          message: `${user.fullName} commented on ${doc.title || "a document"}.`
+        });
+      }
+    }
+
     res.json({ success: true, data: updated });
 
   } catch (err) {
@@ -46,6 +96,7 @@ exports.addDocumentComment = async (req, res) => {
     res.status(500).json({ success: false, message: "Could not add comment" });
   }
 };
+
 
 
 // ======================================================
@@ -58,6 +109,12 @@ exports.addVideoComment = async (req, res) => {
 
     if (!message?.trim()) {
       return res.status(400).json({ success: false, message: "Message is required" });
+    }
+
+    const doc = await TrainingDocument.findById(documentId).populate("assignedParalegals").populate("attorney");
+
+    if (!doc) {
+      return res.status(404).json({ success: false, message: "Document not found" });
     }
 
     const user = {
@@ -86,6 +143,29 @@ exports.addVideoComment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Document or video not found" });
     }
 
+    // 🔔 Notification
+    if (req.user.role === "paralegal") {
+      if (doc.attorney) {
+        await createNotification({
+          recipient: doc.attorney._id,
+          recipientModel: "Attorney",
+          type: "message_received",
+          title: "New Video Comment",
+          message: `${user.fullName} commented on a video in ${doc.title}.`
+        });
+      }
+    } else {
+      for (let para of doc.assignedParalegals) {
+        await createNotification({
+          recipient: para._id,
+          recipientModel: "Paralegal",
+          type: "message_received",
+          title: "New Video Comment",
+          message: `${user.fullName} commented on a video in ${doc.title}.`
+        });
+      }
+    }
+
     res.json({ success: true, data: updated });
 
   } catch (err) {
@@ -93,6 +173,7 @@ exports.addVideoComment = async (req, res) => {
     res.status(500).json({ success: false, message: "Could not add comment" });
   }
 };
+
 
 
 // ======================================================
@@ -107,6 +188,8 @@ exports.replyToDocumentComment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Reply message is required" });
     }
 
+    const doc = await TrainingDocument.findById(documentId).populate("assignedParalegals").populate("attorney");
+
     const repliedBy = {
       firstName: req.user.firstName || "",
       lastName: req.user.lastName || "",
@@ -124,11 +207,7 @@ exports.replyToDocumentComment = async (req, res) => {
 
     const updated = await TrainingDocument.findOneAndUpdate(
       { _id: documentId },
-      {
-        $push: {
-          "files.$[file].comments.$[comment].replies": reply
-        }
-      },
+      { $push: { "files.$[file].comments.$[comment].replies": reply } },
       {
         arrayFilters: [
           { "file._id": fileId },
@@ -142,6 +221,29 @@ exports.replyToDocumentComment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Document, file, or comment not found" });
     }
 
+    // 🔔 Notification logic
+    if (req.user.role === "paralegal") {
+      if (doc.attorney) {
+        await createNotification({
+          recipient: doc.attorney._id,
+          recipientModel: "Attorney",
+          type: "message_received",
+          title: "New Reply on Document",
+          message: `${repliedBy.fullName} replied to a comment.`
+        });
+      }
+    } else {
+      for (let para of doc.assignedParalegals) {
+        await createNotification({
+          recipient: para._id,
+          recipientModel: "Paralegal",
+          type: "message_received",
+          title: "New Reply on Document",
+          message: `${repliedBy.fullName} replied to a comment.`
+        });
+      }
+    }
+
     res.json({ success: true, data: updated });
 
   } catch (err) {
@@ -149,6 +251,7 @@ exports.replyToDocumentComment = async (req, res) => {
     res.status(500).json({ success: false, message: "Could not reply to comment" });
   }
 };
+
 
 
 // ======================================================
@@ -163,6 +266,8 @@ exports.replyToVideoComment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Reply message is required" });
     }
 
+    const doc = await TrainingDocument.findById(documentId).populate("assignedParalegals").populate("attorney");
+
     const repliedBy = {
       firstName: req.user.firstName || "",
       lastName: req.user.lastName || "",
@@ -180,11 +285,7 @@ exports.replyToVideoComment = async (req, res) => {
 
     const updated = await TrainingDocument.findOneAndUpdate(
       { _id: documentId },
-      {
-        $push: {
-          "videos.$[video].comments.$[comment].replies": reply
-        }
-      },
+      { $push: { "videos.$[video].comments.$[comment].replies": reply } },
       {
         arrayFilters: [
           { "video._id": videoId },
@@ -198,6 +299,29 @@ exports.replyToVideoComment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Document, video, or comment not found" });
     }
 
+    // 🔔 Notification
+    if (req.user.role === "paralegal") {
+      if (doc.attorney) {
+        await createNotification({
+          recipient: doc.attorney._id,
+          recipientModel: "Attorney",
+          type: "message_received",
+          title: "New Reply on Video",
+          message: `${repliedBy.fullName} replied on a video comment.`
+        });
+      }
+    } else {
+      for (let para of doc.assignedParalegals) {
+        await createNotification({
+          recipient: para._id,
+          recipientModel: "Paralegal",
+          type: "message_received",
+          title: "New Reply on Video",
+          message: `${repliedBy.fullName} replied on a video comment.`
+        });
+      }
+    }
+
     res.json({ success: true, data: updated });
 
   } catch (err) {
@@ -205,4 +329,5 @@ exports.replyToVideoComment = async (req, res) => {
     res.status(500).json({ success: false, message: "Could not reply to comment" });
   }
 };
+
 
