@@ -2,7 +2,7 @@
 const JSZip = require("jszip");
 const { XMLParser } = require("fast-xml-parser");
 const he = require("he"); // decode entities
-const { JSDOM } = await import("jsdom");
+
 
 
 const parser = new XMLParser({
