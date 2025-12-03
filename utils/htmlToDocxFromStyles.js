@@ -1,6 +1,7 @@
 // utils/htmlToDocxFromStyles.js
 const JSZip = require("jszip");
-const { JSDOM } = require("jsdom");
+const { JSDOM } = await import("jsdom");
+
 
 exports.convertHtmlToDocxUsingStyles = async (html, styleTemplate = {}) => {
   if (!html || typeof html !== "string") html = "";
