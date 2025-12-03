@@ -5,6 +5,7 @@ const Paralegal = require('../models/Paralegal');
 const s3 = require('../config/s3');
 const { PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const { startAIIngest } = require('../queue/ingestQueue');
 
 
 
@@ -80,6 +81,8 @@ exports.saveMetadata = async (req, res) => {
       assignedParalegals, // UPDATED FIELD
     } = req.body;
 
+  
+
     const role = req.user.role;
     const uploadedByName =
       role === "attorney"
@@ -126,7 +129,10 @@ exports.saveMetadata = async (req, res) => {
     });
 
     await newDoc.save();
-    console.log(newDoc);
+      if (assignedTo === "AI" || assignedTo === "Both") {
+    startAIIngest(newDoc._id);
+}
+
 
     // Send notifications
     if (processedParalegals.length > 0) {

@@ -1,37 +1,37 @@
 const mongoose = require('mongoose');
-require('./Attorney');   // <-- IMPORTANT
-require('./Paralegal');  // <-- IMPORTANT
-
+require('./Attorney');   
+require('./Paralegal');  
 
 
 /* ===========================
-   REPLY SCHEMA (Simplified - Embed User Data)
+   REPLY SCHEMA
 =========================== */
 const replySchema = new mongoose.Schema({
-  repliedBy: {  // Embed name and email directly
-    firstName: { type: String, required: false },
-    lastName: { type: String, required: false },
+  repliedBy: {
+    firstName: { type: String },
+    lastName: { type: String },
     fullName: { type: String },
     email: { type: String },
-    role: { type: String, enum: ["Paralegal", "Attorney"], required: true },  // Keep role for filtering
-    _id: { type: mongoose.Schema.Types.ObjectId, required: true }  // Keep ID for other uses
+    role: { type: String, enum: ["Paralegal", "Attorney"], required: true },
+    _id: { type: mongoose.Schema.Types.ObjectId, required: true }
   },
   message: { type: String, required: true },
   createdAt: { type: Date, default: Date.now }
 });
 
+
 /* ===========================
-   COMMENT SCHEMA (Simplified - Embed User Data)
+   COMMENT SCHEMA
 =========================== */
 const commentSchema = new mongoose.Schema({
   message: { type: String, required: true },
-  createdBy: {  // Embed name and email directly
+  createdBy: {
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     fullName: { type: String },
     email: { type: String },
-    role: { type: String, enum: ['Attorney', 'Paralegal'], required: true },  // Keep role for filtering
-    _id: { type: mongoose.Schema.Types.ObjectId, required: true }  // Keep ID for other uses
+    role: { type: String, enum: ['Attorney', 'Paralegal'], required: true },
+    _id: { type: mongoose.Schema.Types.ObjectId, required: true }
   },
   createdAt: { type: Date, default: Date.now },
   replies: [replySchema]
@@ -39,13 +39,14 @@ const commentSchema = new mongoose.Schema({
 
 
 /* ===========================
-   FILE PROGRESS PER PARALEGAL
+   FILE PROGRESS
 =========================== */
 const fileProgressSchema = new mongoose.Schema({
   paralegalId: { type: mongoose.Schema.Types.ObjectId, ref: "Paralegal", required: true },
   percentageRead: { type: Number, default: 0 },
   lastUpdated: { type: Date, default: Date.now }
 });
+
 
 /* ===========================
    FILE SCHEMA
@@ -60,14 +61,16 @@ const fileSchema = new mongoose.Schema({
   comments: [commentSchema]
 });
 
+
 /* ===========================
-   VIDEO PROGRESS PER PARALEGAL
+   VIDEO PROGRESS
 =========================== */
 const videoProgressSchema = new mongoose.Schema({
   paralegalId: { type: mongoose.Schema.Types.ObjectId, ref: "Paralegal", required: true },
   percentageWatched: { type: Number, default: 0 },
   lastUpdated: { type: Date, default: Date.now }
 });
+
 
 /* ===========================
    VIDEO SCHEMA
@@ -84,42 +87,69 @@ const videoSchema = new mongoose.Schema({
   comments: [commentSchema]
 });
 
+
+/* ===========================
+   🔥 FORMAT TEMPLATE STORAGE (NEW)
+=========================== */
+const formatTemplateSchema = new mongoose.Schema({
+  sectPr: { type: mongoose.Schema.Types.Mixed, default: null },
+  stylesXml: { type: String, default: null },
+  numberingXml: { type: String, default: null },
+  headers: { type: mongoose.Schema.Types.Mixed, default: null },
+  footers: { type: mongoose.Schema.Types.Mixed, default: null }
+}, { _id: false });
+
+
 /* ===========================
    MAIN TRAINING DOCUMENT
 =========================== */
 const trainingDocumentSchema = new mongoose.Schema(
   {
     documentName: { type: String, required: true },
+
     documentType: {
       type: String,
       required: true,
       enum: ['AI Draft', 'Paralegal Template', 'SOP', 'Research Material', 'Other'],
     },
+
     assignedTo: {
       type: String,
       required: true,
       enum: ['AI', 'Paralegal', 'Both'],
     },
+
     assignedParalegals: [
       { type: mongoose.Schema.Types.ObjectId, ref: "Paralegal" }
     ],
+
     priority: {
       type: String,
       required: true,
       enum: ['Low', 'Medium', 'High'],
       default: 'Low',
     },
+
     description: { type: String },
+
+    /* Files + Videos */
     files: [fileSchema],
     videos: [videoSchema],
+
+    /* Uploaded By */
     uploadedBy: { type: String },
     uploadedById: { type: mongoose.Schema.Types.ObjectId, refPath: 'uploadedByModel' },
     uploadedByModel: { type: String, enum: ['Attorney', 'Paralegal'] },
+
+    /* 🔥 AI Processing Status – FIXED ENUM */
     status: {
       type: String,
-      enum: ['Pending Review', 'In Training', 'Completed'],
+      enum: ['Pending Review', 'Processing', 'Trained', 'Failed', 'In Training', 'Completed'],
       default: 'Pending Review',
-    }
+    },
+
+    /* 🔥 Format Template Stored After DOCX Extraction */
+    formatTemplate: formatTemplateSchema
   },
   { timestamps: true }
 );

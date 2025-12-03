@@ -13,6 +13,7 @@ const trainingCommentRoutes = require("./routes/trainingCommentRoutes");
 
 
 
+
 const app = express();
 app.use(corsConfig);
 app.set('trust proxy', 1);
@@ -60,6 +61,12 @@ app.use('/api', meetingRoutes);
 
 app.use("/api/training/progress", trainingProgressRoutes);
 app.use("/api/training/comments", trainingCommentRoutes);
+app.use("/api/ai", require('./routes/trainingAI'));
+
+
+
+
+
 
 
 // ✅ 7. 404 + error handlers
