@@ -1,17 +1,26 @@
 // utils/htmlToDocxFromStyles.js
 const JSZip = require("jszip");
-const { JSDOM } = await import("jsdom");
 
+
+// 🔥 Fix: lazy-load jsdom in CommonJS
+async function getJsdom() {
+  const { JSDOM } = await import("jsdom");
+  return JSDOM;
+}
 
 exports.convertHtmlToDocxUsingStyles = async (html, styleTemplate = {}) => {
   if (!html || typeof html !== "string") html = "";
+
   // Strip code fences
   html = html.replace(/^```(?:html)?\s*/i, "").replace(/\s*```$/i, "").trim();
 
-  // Auto-wrap plain text lines to paragraphs
+  // Auto-wrap plain text
   if (!/<[a-z][\s\S]*>/i.test(html)) {
     html = `<p>${html.trim().split(/\r?\n+/).map(s => s.trim()).filter(Boolean).join("</p><p>")}</p>`;
   }
+
+  // 🔥 Fix: load jsdom here
+  const JSDOM = await getJsdom();
 
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`);
   const body = dom.window.document.body;
@@ -37,17 +46,19 @@ exports.convertHtmlToDocxUsingStyles = async (html, styleTemplate = {}) => {
   w.file("document.xml", docXml);
   w.file("styles.xml", stylesXml);
   w.file("numbering.xml", numberingXml);
+
   if (headersXml && typeof headersXml === "object") {
-    // header files expected as { 'header1.xml': '<xml>..' }
     for (const [k, v] of Object.entries(headersXml)) {
       w.file(k, v);
     }
   }
+
   if (footersXml && typeof footersXml === "object") {
     for (const [k, v] of Object.entries(footersXml)) {
       w.file(k, v);
     }
   }
+
   w.folder("_rels").file("document.xml.rels", docRelsXml());
 
   return await zip.generateAsync({ type: "nodebuffer" });
