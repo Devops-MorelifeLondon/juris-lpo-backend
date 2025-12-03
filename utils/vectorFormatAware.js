@@ -11,7 +11,6 @@ exports.embedAndStore = async (docId, chunks) => {
       model: "text-embedding-3-small",
       input: raw
     });
-
     await AIVector.create({
       docId,
       html: chunk.html,

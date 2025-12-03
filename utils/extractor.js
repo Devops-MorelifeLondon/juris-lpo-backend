@@ -1,66 +1,49 @@
 // utils/extractor.js
-// Simple extractor utilities:
-// - extractPDF(buffer): returns [{ page, text, heading }]
-// - extractDOCX(buffer): returns [{ page, html, heading }]
-//
-// Uses: pdf-parse, mammoth
-
-const pdfParse = require("pdf-parse");
+// Reworked to use pdfjs-dist (dynamic import) and mammoth for DOCX
 const mammoth = require("mammoth");
 
 /**
  * extractPDF(buffer)
- * - buffer: Buffer of PDF file
- * Returns: array of pages: [{ page: 1, text: "...", heading: null }, ...]
+ * - Uses pdfjs-dist dynamically to avoid top-level native deps
+ * - Returns array of pages: [{ page: 1, text: "..." }, ...]
  */
 exports.extractPDF = async (buffer) => {
-  const data = await pdfParse(buffer);
-
-  // pdf-parse returns a single text blob with form-feed (\f) page separators in many PDFs.
-  // Split on that to create page-like chunks. Fallback to splitting by double newlines.
-  const raw = data.text || "";
-  let pages = raw.split("\f").map((t) => t && t.trim()).filter(Boolean);
-
-  if (pages.length === 0) {
-    // fallback: split by two or more newlines into paragraphs then group into pages (~900 words)
-    const paras = raw.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
-    pages = [];
-    let cur = "";
-    let curWords = 0;
-    let pageIndex = 1;
-    for (const para of paras) {
-      const words = para.split(/\s+/).length;
-      if (curWords + words > 900 && cur) {
-        pages.push(cur.trim());
-        cur = para;
-        curWords = words;
-      } else {
-        cur += `\n\n${para}`;
-        curWords += words;
+  try {
+    // dynamic import - safe in CommonJS as inside async function
+    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.js");
+    const loadingTask = pdfjsLib.getDocument({ data: buffer });
+    const doc = await loadingTask.promise;
+    const pages = [];
+    for (let i = 1; i <= doc.numPages; i++) {
+      try {
+        const page = await doc.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items.map((it) => (it && it.str) ? it.str : "").join(" ");
+        pages.push({ page: i, text: pageText, heading: null });
+      } catch (pageErr) {
+        console.warn(`[extractPDF] failed to extract page ${i}:`, pageErr && pageErr.message ? pageErr.message : pageErr);
+        pages.push({ page: i, text: "", heading: null });
       }
     }
-    if (cur.trim()) pages.push(cur.trim());
+    return pages;
+  } catch (err) {
+    console.error("[extractPDF] pdf extractor failed:", err && err.stack ? err.stack : err);
+    // fallback: try simple text attempt with pdfjs-dist's Node worker path altered (if needed)
+    throw err;
   }
-
-  return pages.map((t, i) => ({
-    page: i + 1,
-    text: t,
-    heading: null
-  }));
 };
 
 /**
  * extractDOCX(buffer)
- * - buffer: Buffer of DOCX file
- * Returns: array with a single page object: [{ page:1, html: "<p>...</p>", heading: null }]
- *
- * Uses mammoth.convertToHtml to preserve basic formatting (headings, bold, lists).
+ * - Uses mammoth.convertToHtml for safe HTML output
  */
 exports.extractDOCX = async (buffer) => {
-  const result = await mammoth.convertToHtml({ buffer });
-  return [{
-    page: 1,
-    html: result.value,
-    heading: null
-  }];
+  try {
+    const result = await mammoth.convertToHtml({ buffer });
+    // return single-page array (no layout engine)
+    return [{ page: 1, html: result.value, text: (result.value || "").replace(/<[^>]+>/g, ""), heading: null }];
+  } catch (err) {
+    console.error("[extractDOCX] mammoth failed:", err);
+    return [{ page: 1, html: "", text: "", heading: null }];
+  }
 };
