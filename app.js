@@ -62,6 +62,7 @@ app.use('/api', meetingRoutes);
 app.use("/api/training/progress", trainingProgressRoutes);
 app.use("/api/training/comments", trainingCommentRoutes);
 app.use("/api/ai", require('./routes/trainingAI'));
+app.use("/api", require('./routes/paymentRoutes'));
 
 
 

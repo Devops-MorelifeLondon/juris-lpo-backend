@@ -1,221 +1,169 @@
-// const Stripe = require('stripe');
-// const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-// const Attorney = require('../models/Attorney');
-// const Transaction = require('../models/Transaction');
-// const Subscription = require('../models/Subscription');
+const Stripe = require("stripe");
+const ServiceOrder = require("../models/ServiceOrder");
 
-// // 1. One-Time Payment Intent (Custom Services)
-// exports.createPaymentIntent = async (req, res) => {
-//   try {
-//     const { amount, serviceName, attorneyId } = req.body;
+const stripe = Stripe(process.env.STRIPE_SECRET);
 
-//     // Create the PaymentIntent
-//     const paymentIntent = await stripe.paymentIntents.create({
-//       amount: amount, // Amount in cents
-//       currency: 'usd',
-//       metadata: {
-//         attorneyId,
-//         serviceName,
-//         type: 'one_time_service'
-//       },
-//       automatic_payment_methods: {
-//         enabled: true,
-//       },
-//     });
+/**********************************************
+ * CREATE PAYMENT INTENT (Custom UI)
+ **********************************************/
+exports.createPaymentIntent = async (req, res) => {
+    try {
+        // 1. Receive the 'address' object sent from your Frontend
+        const { serviceName, price, plan, stripePriceId, address } = req.body;
+        
+        // 2. Security: Get the User ID/Name from the logged-in user (from middleware)
+        const userId = req.user._id; 
+        const userRole = req.user.role;
+        
+        // Construct a customer name (Required for India Export)
+        const customerName = req.user.role === 'attorney' 
+            ? req.user.fullName 
+            : `${req.user.firstName} ${req.user.lastName}`;
 
-//     res.status(200).json({
-//       clientSecret: paymentIntent.client_secret,
-//       id: paymentIntent.id
-//     });
-//   } catch (error) {
-//     console.error('Error creating payment intent:', error);
-//     res.status(500).json({ error: error.message });
-//   }
-// };
+        // 3. Validation: Ensure address exists before asking Stripe
+        if (!address || !address.line1 || !address.city || !address.country) {
+            return res.status(400).json({ 
+                error: "Billing address (Line1, City, Country) is required for international payments." 
+            });
+        }
 
-// // 2. Create Subscription (Recurring Plans)
-// exports.createSubscription = async (req, res) => {
-//   try {
-//     const { priceId, attorneyId } = req.body;
-    
-//     // Find the attorney to get/create Stripe Customer ID
-//     const attorney = await Attorney.findById(attorneyId);
-//     if (!attorney) return res.status(404).json({ error: 'Attorney not found' });
+        const amount = Number(price.replace("$", "").replace(",", "")) * 100;
 
-//     let customerId = attorney.stripeCustomerId;
+        // 4. Create local DB record
+        const order = await ServiceOrder.create({
+            userId,
+            userRole,
+            serviceName,
+            price: amount / 100,
+            plan,
+            stripePriceId,
+            billingDetails: address, // Save address in your DB too
+            status: "pending"
+        });
 
-//     // Create Stripe Customer if not exists
-//     if (!customerId) {
-//       const customer = await stripe.customers.create({
-//         email: attorney.email,
-//         name: attorney.fullName,
-//         metadata: {
-//           attorneyId: attorney._id.toString()
-//         }
-//       });
-//       customerId = customer.id;
-      
-//       // Save customer ID to Attorney model
-//       attorney.stripeCustomerId = customerId;
-//       await attorney.save();
-//     }
-
-//     // Create the subscription
-//     const subscription = await stripe.subscriptions.create({
-//       customer: customerId,
-//       items: [{ price: priceId }],
-//       payment_behavior: 'default_incomplete',
-//       payment_settings: { save_default_payment_method: 'on_subscription' },
-//       expand: ['latest_invoice.payment_intent'],
-//       metadata: {
-//         attorneyId: attorneyId,
-//         type: 'subscription_creation'
-//       }
-//     });
-
-//     res.status(200).json({
-//       subscriptionId: subscription.id,
-//       clientSecret: subscription.latest_invoice.payment_intent.client_secret,
-//     });
-//   } catch (error) {
-//     console.error('Error creating subscription:', error);
-//     res.status(500).json({ error: error.message });
-//   }
-// };
-
-// // 3. Webhook Handler (Updates DB based on Stripe events)
-// exports.handleStripeWebhook = async (req, res) => {
-//   const sig = req.headers['stripe-signature'];
-//   let event;
-
-//   try {
-//     event = stripe.webhooks.constructEvent(
-//       req.rawBody, // Ensure your express app preserves raw body for this route
-//       sig,
-//       process.env.STRIPE_WEBHOOK_SECRET
-//     );
-//   } catch (err) {
-//     console.error(`Webhook signature verification failed: ${err.message}`);
-//     return res.status(400).send(`Webhook Error: ${err.message}`);
-//   }
-
-//   // Handle specific events
-//   switch (event.type) {
-//     // A) One-time payment succeeded
-//     case 'payment_intent.succeeded':
-//       await handlePaymentSuccess(event.data.object);
-//       break;
-
-//     // B) Subscription invoice paid (Recurring)
-//     case 'invoice.payment_succeeded':
-//       await handleInvoiceSuccess(event.data.object);
-//       break;
-
-//     // C) Subscription updated/deleted
-//     case 'customer.subscription.updated':
-//     case 'customer.subscription.deleted':
-//       await handleSubscriptionUpdate(event.data.object);
-//       break;
-      
-//     default:
-//       console.log(`Unhandled event type ${event.type}`);
-//   }
-
-//   res.json({ received: true });
-// };
-
-// // --- Helper Functions for Webhook ---
-
-// async function handlePaymentSuccess(paymentIntent) {
-//   // Only handle if it's a one-time service (metadata check)
-//   if (paymentIntent.metadata.type === 'one_time_service') {
-//     await Transaction.create({
-//       attorney: paymentIntent.metadata.attorneyId,
-//       stripePaymentIntentId: paymentIntent.id,
-//       amount: paymentIntent.amount,
-//       currency: paymentIntent.currency,
-//       status: 'succeeded',
-//       paymentMethod: {
-//         // You'd typically fetch the PaymentMethod object to get brand/last4
-//         // simplified here for brevity
-//         brand: 'card', 
-//         last4: 'xxxx' 
-//       },
-//       type: 'one_time_service',
-//       description: paymentIntent.metadata.serviceName,
-//       billingDetails: {
-//         email: paymentIntent.receipt_email
-//       },
-//       receiptUrl: paymentIntent.charges.data[0]?.receipt_url
-//     });
-//   }
-// }
-
-// async function handleInvoiceSuccess(invoice) {
-//   // This handles recurring subscription payments
-//   if (invoice.subscription) {
-//      const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
-     
-//      // 1. Create Transaction Record
-//      await Transaction.create({
-//       attorney: subscription.metadata.attorneyId,
-//       subscription: await getSubscriptionIdByStripeId(invoice.subscription),
-//       stripePaymentIntentId: invoice.payment_intent,
-//       stripeInvoiceId: invoice.id,
-//       amount: invoice.amount_paid,
-//       currency: invoice.currency,
-//       status: 'succeeded',
-//       type: 'subscription_cycle',
-//       description: `Subscription Renewal - ${new Date().toLocaleDateString()}`,
-//       receiptUrl: invoice.hosted_invoice_url
-//     });
-
-//     // 2. Update Subscription Model Dates
-//     await Subscription.findOneAndUpdate(
-//       { stripeSubscriptionId: invoice.subscription },
-//       {
-//         status: 'active',
-//         currentPeriodStart: new Date(subscription.current_period_start * 1000),
-//         currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-//       }
-//     );
-//   }
-// }
-
-// async function handleSubscriptionUpdate(stripeSub) {
-//     const statusMap = {
-//         'active': 'active',
-//         'past_due': 'past_due',
-//         'canceled': 'canceled',
-//         'unpaid': 'unpaid'
-//     };
-
-//     await Subscription.findOneAndUpdate(
-//         { stripeSubscriptionId: stripeSub.id },
-//         { 
-//             status: statusMap[stripeSub.status] || 'incomplete',
-//             canceledAt: stripeSub.canceled_at ? new Date(stripeSub.canceled_at * 1000) : null
-//         },
-//         { upsert: true } // Create if doesn't exist (sync safety)
-//     );
-// }
-
-// // Helper to resolve MongoID from StripeSubID
-// async function getSubscriptionIdByStripeId(stripeSubId) {
-//     const sub = await Subscription.findOne({ stripeSubscriptionId: stripeSubId });
-//     return sub ? sub._id : null;
-// }
-
-// // 4. Get Transaction History
-// exports.getTransactions = async (req, res) => {
-//     try {
-//         const { attorneyId } = req.params;
-//         const transactions = await Transaction.find({ attorney: attorneyId })
-//             .sort({ createdAt: -1 })
-//             .limit(20);
+        // 5. Create Stripe Intent (THE CRITICAL FIX IS HERE)
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount,
+            currency: "usd",
+            automatic_payment_methods: { enabled: true },
             
-//         res.json(transactions);
-//     } catch (error) {
-//         res.status(500).json({ error: error.message });
-//     }
-// };
+            // --- MANDATORY FOR INDIA EXPORTS ---
+            description: `Export: ${serviceName} - ${plan}`,
+            shipping: {
+                name: customerName, // Must match a real person's name
+                address: {
+                    line1: address.line1,
+                    line2: address.line2 || "",
+                    city: address.city,
+                    state: address.state || "",
+                    postal_code: address.postal_code,
+                    country: address.country, // Must be ISO code (e.g. 'US', 'GB')
+                }
+            },
+            // -----------------------------------
+
+            metadata: {
+                orderId: order._id.toString(),
+                userId: userId.toString(),
+                serviceName
+            },
+        });
+
+        order.stripePaymentIntentId = paymentIntent.id;
+        await order.save();
+
+        return res.json({
+            clientSecret: paymentIntent.client_secret,
+            orderId: order._id
+        });
+
+    } catch (error) {
+        console.error("PaymentIntent error:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+/**********************************************
+ * CHECKOUT SESSION (Stripe Hosted)
+ **********************************************/
+exports.createCheckoutSession = async (req, res) => {
+    try {
+        const { serviceName, plan, stripePriceId } = req.body;
+        const userId = req.user._id;
+        const userRole = req.user.role;
+
+        const order = await ServiceOrder.create({
+            userId,
+            userRole,
+            serviceName,
+            plan,
+            stripePriceId
+        });
+
+        const session = await stripe.checkout.sessions.create({
+            mode: "payment",
+            
+            // --- CRITICAL FIX FOR INDIA EXPORTS ---
+            billing_address_collection: "required", 
+            // --------------------------------------
+            
+            customer_email: req.user.email,
+            line_items: [
+                {
+                    price: stripePriceId,
+                    quantity: 1
+                }
+            ],
+            metadata: { 
+                orderId: order._id.toString(),
+                userId: userId.toString()
+            },
+            success_url: "http://localhost:5173/payment-success?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url: "http://localhost:5173/payment-cancel"
+        });
+
+        order.stripeSessionId = session.id;
+        await order.save();
+
+        return res.json({ url: session.url });
+    } catch (err) {
+        console.error("Checkout session error:", err);
+        res.status(500).json({ error: "Checkout session failed" });
+    }
+};
+
+/**********************************************
+ * STRIPE WEBHOOK
+ **********************************************/
+exports.stripeWebhook = async (req, res) => {
+    const sig = req.headers["stripe-signature"];
+    let event;
+
+    try {
+        event = stripe.webhooks.constructEvent(
+            req.rawBody,
+            sig,
+            process.env.STRIPE_WEBHOOK_SECRET
+        );
+    } catch (err) {
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    const data = event.data.object;
+
+    if (event.type === "payment_intent.succeeded") {
+        await ServiceOrder.findOneAndUpdate(
+            { stripePaymentIntentId: data.id },
+            { status: "paid" }
+        );
+    }
+
+    if (event.type === "checkout.session.completed") {
+        await ServiceOrder.findOneAndUpdate(
+            { stripeSessionId: data.id },
+            { status: "paid" }
+        );
+    }
+
+    res.json({ received: true });
+};
