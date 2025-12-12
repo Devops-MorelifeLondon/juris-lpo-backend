@@ -11,7 +11,10 @@ const getUserModel = (role) => {
 exports.getTimeLogs = async (req, res) => {
   try {
     const { caseId, taskId, isRunning } = req.query;
-    const filter = { user: req.user._id };
+    const filter = {};
+      if (req.user.role !== "attorney") {
+      filter.user = req.user._id;
+    }
 
     if (caseId) filter.case = caseId;
     if (taskId) filter.task = taskId;
@@ -20,6 +23,7 @@ exports.getTimeLogs = async (req, res) => {
     if (isRunning === 'true' || isRunning === true) {
        filter.isRunning = true;
     }
+  
 
     const logs = await TimeEntry.find(filter)
       .populate('case', 'title caseNumber') 

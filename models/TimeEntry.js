@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const timeEntrySchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
-    required: true
+    required: true,
+    ref: 'Paralegal' // Your existing User model
   },
   case: {
     type: mongoose.Schema.Types.ObjectId,
