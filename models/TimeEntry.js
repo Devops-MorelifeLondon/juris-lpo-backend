@@ -39,6 +39,11 @@ const timeEntrySchema = new mongoose.Schema({
   isRunning: {
     type: Boolean,
     default: false
+  },
+  invoice: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Invoice',
+    default: null // Critical for the unbilled filter to work
   }
 }, { timestamps: true });
 

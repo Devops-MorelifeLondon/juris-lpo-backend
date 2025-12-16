@@ -1,4 +1,5 @@
 const TimeEntry = require('../models/TimeEntry');
+const Task = require('../models/Task');
 const ExcelJS = require('exceljs');
 
 // Helper to determine model name from role
@@ -10,35 +11,92 @@ const getUserModel = (role) => {
 
 exports.getTimeLogs = async (req, res) => {
   try {
-    const { caseId, taskId, isRunning } = req.query;
+    const {
+      caseId,
+      taskId,
+      isRunning,
+      assignedBy,
+      isBillable,
+      startDate,
+      endDate,
+      invoice
+    } = req.query;
+
     const filter = {};
-      if (req.user.role !== "attorney") {
+
+    /* 1. Security */
+    if (req.user.role !== "attorney") {
       filter.user = req.user._id;
     }
 
+    /* 2. Direct filters */
     if (caseId) filter.case = caseId;
     if (taskId) filter.task = taskId;
-    
-    // Handle boolean string from query params
-    if (isRunning === 'true' || isRunning === true) {
-       filter.isRunning = true;
+
+    /* 3. Boolean filters */
+    if (isRunning === 'true') filter.isRunning = true;
+    if (isBillable === 'true') filter.isBillable = true;
+
+    /* 4. Invoice (unbilled) filter */
+    if (invoice === 'null') {
+      filter.invoice = null;
+    } else if (invoice) {
+      filter.invoice = invoice;
     }
-  
+
+    /* 5. Date range - FIXED */
+    // Use createdAt because startTime becomes null when a timer stops
+    if (startDate || endDate) {
+      const dateRange = {};
+      if (startDate) dateRange.$gte = new Date(startDate);
+
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateRange.$lte = end;
+      }
+
+      filter.createdAt = dateRange; 
+    }
+
+    /* 6. assignedBy → tasks → timeEntries */
+    if (assignedBy) {
+      // Find all tasks created by this attorney
+      const attorneyTasks = await Task.find({ assignedBy })
+        .select('_id')
+        .lean();
+
+      const taskIds = attorneyTasks.map(t => t._id.toString());
+
+      if (filter.task) {
+        // If a specific taskId was requested, ensure it belongs to this attorney
+        if (!taskIds.includes(filter.task.toString())) {
+          return res.status(200).json({ success: true, data: [] });
+        }
+        // If it matches, we leave filter.task as is (the specific ID)
+      } else {
+        // If no specific task requested, get ALL tasks for this attorney
+        filter.task = { $in: taskIds };
+      }
+    }
+
+    console.log("Final TimeEntry Filter:", filter);
 
     const logs = await TimeEntry.find(filter)
-      .populate('case', 'title caseNumber') 
-      .populate('task', 'name')
-      // Populate user dynamically based on the stored userModel
-      .populate('user', 'firstName lastName fullName email') 
-      .sort({ createdAt: -1 });
+      .populate('case', 'title caseNumber')
+      .populate('task', 'title status')
+      .populate('user', 'firstName lastName fullName email')
+      .sort({ createdAt: -1 }); // Sort by creation date usually makes more sense for logs
+      console.log("Time Logs Retrieved:", logs);
 
-    // Send wrapped in data object for consistency
     res.status(200).json({ success: true, data: logs });
+
   } catch (error) {
-    console.error(error);
+    console.error("getTimeLogs Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 exports.startTimer = async (req, res) => {
   try {
@@ -127,8 +185,22 @@ exports.deleteEntry = async (req, res) => {
 
 exports.exportToExcel = async (req, res) => {
   try {
-    const logs = await TimeEntry.find({ user: req.user._id })
-      .populate('task', 'title'); // FIXED
+    const { taskId } = req.query;
+
+    console.log("Exporting time logs for user:", req.user._id, "Task:", taskId);
+
+    // 🔹 Base filter: logged-in user
+    const filter = {
+      user: req.user._id,
+    };
+
+    // 🔹 If taskId is passed, filter by task
+    if (taskId) {
+      filter.task = taskId;
+    }
+
+    const logs = await TimeEntry.find(filter)
+      .populate('task', 'title');
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Time Logs');
@@ -143,20 +215,34 @@ exports.exportToExcel = async (req, res) => {
 
     logs.forEach(log => {
       worksheet.addRow({
-        date: log.createdAt ? log.createdAt.toISOString().split('T')[0] : '',
-        task: log.task ? log.task.title : 'N/A',  // FIXED
-        description: log.description,
+        date: log.createdAt
+          ? log.createdAt.toISOString().split('T')[0]
+          : '',
+        task: log.task ? log.task.title : 'N/A',
+        description: log.description || '',
         duration: (log.duration / 3600).toFixed(2),
-        billable: log.isBillable ? 'Yes' : 'No'
+        billable: log.isBillable ? 'Yes' : 'No',
       });
     });
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=time_logs.xlsx');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=time_logs.xlsx'
+    );
+
     await workbook.xlsx.write(res);
     res.end();
 
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
+

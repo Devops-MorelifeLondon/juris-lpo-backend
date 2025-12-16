@@ -53,7 +53,6 @@ app.use('/api/cases', require('./routes/case.routes'));
 app.use('/api/tasks', require('./routes/taskRoutes'));
 app.use('/api/paralegals', require('./routes/paralegal.auth.routes'));
 app.use('/api/notifications', require('./routes/notificationsRoutes'));
-app.use('/api/tasklogs', require('./routes/taskLogs.routes'))
 app.use('/api/training', require('./routes/trainingRoutes'));
 // Routes
 app.use('/api/chat', chatRoutes);
@@ -63,8 +62,9 @@ app.use('/api', meetingRoutes);
 app.use("/api/training/progress", trainingProgressRoutes);
 app.use("/api/training/comments", trainingCommentRoutes);
 app.use("/api/ai", require('./routes/trainingAI'));
-app.use("/api", require('./routes/paymentRoutes'));
 app.use("/api/time-entries", require('./routes/timeEntryRoutes'));
+app.use("/api/billing", require('./routes/billingRoutes'));
+app.use("/api", require('./routes/paymentRoutes'));
 
 
 

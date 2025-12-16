@@ -1,11 +1,10 @@
-// models/Invoice.js
 const mongoose = require('mongoose');
 
 const invoiceSchema = new mongoose.Schema({
   invoiceNumber: {
     type: String,
-    unique: true,
-    required: true
+    required: true,
+    unique: true
   },
   attorney: {
     type: mongoose.Schema.Types.ObjectId,
@@ -17,44 +16,38 @@ const invoiceSchema = new mongoose.Schema({
     ref: 'Paralegal',
     required: true
   },
-  case: {
+  // Link specific time entries to this invoice to prevent double billing
+  timeEntries: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Case',
-    required: true
-  },
-  billingPeriod: {
-    startDate: {
-      type: Date,
-      required: true
-    },
-    endDate: {
-      type: Date,
-      required: true
-    }
-  },
-  workLogs: [{
+    ref: 'TimeEntry'
+  }],
+  // Link specific tasks (for fixed-fee billing scenarios)
+  tasks: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'WorkLog'
+    ref: 'Task'
   }],
   items: [{
     description: String,
-    hours: Number,
+    quantity: Number, // Hours or Units
     rate: Number,
-    amount: Number
+    amount: Number,
+    refType: { type: String, enum: ['TimeEntry', 'Task', 'Adjustment'] },
+    refId: mongoose.Schema.Types.ObjectId
   }],
   subtotal: {
     type: Number,
-    required: true
+    required: true,
+    default: 0
   },
   tax: {
-    percentage: Number,
-    amount: Number
+    type: Number,
+    default: 0
   },
   platformFee: {
-    percentage: Number,
-    amount: Number
+    type: Number,
+    default: 0
   },
-  total: {
+  totalAmount: {
     type: Number,
     required: true
   },
@@ -64,33 +57,27 @@ const invoiceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Draft', 'Sent', 'Paid', 'Overdue', 'Cancelled'],
+    enum: ['Draft', 'Sent', 'Paid', 'Overdue', 'Cancelled', 'Void'],
     default: 'Draft'
+  },
+  issueDate: {
+    type: Date,
+    default: Date.now
   },
   dueDate: {
     type: Date,
     required: true
   },
-  paidDate: Date,
-  paymentMethod: String,
-  transactionId: String,
-  pdfUrl: String,
-  notes: String
+  paidAt: Date,
+  notes: String,
+  terms: String // e.g., "Net 30"
 }, {
   timestamps: true
 });
 
-// Auto-generate invoice number
-invoiceSchema.pre('save', async function(next) {
-  if (this.isNew && !this.invoiceNumber) {
-    const count = await mongoose.model('Invoice').countDocuments();
-    this.invoiceNumber = `INV-${new Date().getFullYear()}-${String(count + 1).padStart(6, '0')}`;
-  }
-  next();
-});
-
-// Indexes
+// Indexes for quick lookup
 invoiceSchema.index({ attorney: 1, status: 1 });
 invoiceSchema.index({ paralegal: 1, status: 1 });
+invoiceSchema.index({ invoiceNumber: 1 });
 
 module.exports = mongoose.model('Invoice', invoiceSchema);
