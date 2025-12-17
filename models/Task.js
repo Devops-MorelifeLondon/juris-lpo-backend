@@ -1,4 +1,4 @@
-// models/Task.js - Updated schema
+// models/Task.js
 const mongoose = require('mongoose');
 
 const taskSchema = new mongoose.Schema({
@@ -26,8 +26,7 @@ const taskSchema = new mongoose.Schema({
     ref: 'Paralegal',
     required: false // Set when accepted
   },
-
-  domain: { // CRITICAL: Added for filtering
+  domain: { 
     type: String,
     enum: [
       'Family Law', 'Personal Injury', 'Real Estate', 'Estate Planning',
@@ -89,9 +88,11 @@ const taskSchema = new mongoose.Schema({
     },
     completedAt: Date
   }],
+  // ✅ Attachments Schema Updated
   attachments: [{
     name: String,
     url: String,
+    key: String, // ✅ Added to store S3 Key
     size: Number,
     uploadedAt: {
       type: Date,
@@ -107,7 +108,7 @@ const taskSchema = new mongoose.Schema({
 // Indexes for performance
 taskSchema.index({ assignedBy: 1, status: 1 });
 taskSchema.index({ assignedTo: 1, dueDate: 1 });
-taskSchema.index({ domain: 1, status: 1, 'assignedTo': 1 }); // Critical for domain filtering
+taskSchema.index({ domain: 1, status: 1, 'assignedTo': 1 }); 
 taskSchema.index({ status: 1, dueDate: 1 });
 taskSchema.index({ 'domain': 1, 'status': 1, createdAt: -1 });
 taskSchema.index({ assignedTo: 1, status: 1, createdAt: -1 });

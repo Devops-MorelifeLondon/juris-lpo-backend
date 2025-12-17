@@ -1,7 +1,7 @@
 // controllers/trainingController.js
 const TrainingDocument = require('../models/TrainingDocument');
 const Notification = require('../models/Notification');
-const s3 = require('../config/s3');
+const {s3} = require('../config/s3');
 const { PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
@@ -147,7 +147,8 @@ exports.getUploadHistory = async (req, res) => {
 
 exports.getPresignedDownloadUrl = async (req, res) => {
   try {
-    const key = req.query.key || req.query.filePath;
+    const rawKey = req.query.key || req.query.filePath;
+    const key = decodeURIComponent(rawKey);
     if (!key) return res.status(400).json({ success: false, message: "File key is required" });
     const command = new GetObjectCommand({ Bucket: process.env.AWS_BUCKET_NAME, Key: key });
     const downloadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
