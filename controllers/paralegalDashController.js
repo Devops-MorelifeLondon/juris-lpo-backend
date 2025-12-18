@@ -181,8 +181,11 @@ exports.getAvailableTasks = async (req, res) => {
     const paralegal = await Paralegal.findById(paralegalId)
       .select('practiceAreas specializations currentActiveCases maxActiveCases firstName lastName');
 
+    const currenttasks = await Task.find({assignedTo: paralegalId, status: { $in: ['To do', 'Not Started', 'In Progress', 'In Review', 'Completed'] } }).countDocuments();
     
-    const currentLoad = paralegal.currentActiveCases || 0;
+    
+    
+    const currentLoad = currenttasks || 0;
     const maxCapacity = paralegal.maxActiveCases || 10;
     const availableSlots = Math.max(0, maxCapacity - currentLoad);
 
@@ -298,8 +301,6 @@ exports.acceptTask = async (req, res) => {
     const { taskId } = req.params;
     const paralegalId = req.user._id;
 
-    console.log("Task Id : ", taskId);
-    console.log("Paralegal Id ", paralegalId);
 
     // Start transaction for atomicity
     const session = await mongoose.startSession();
@@ -469,9 +470,7 @@ exports.declineTask = async (req, res) => {
     const { taskId } = req.params;
     const { reason } = req.body;
     const paralegalId = req.user._id;
-    console.log(req.params);
-    console.log(req.body);
-
+ 
     // Get paralegal details for domain verification
     const paralegal = await Paralegal.findById(paralegalId).select('practiceAreas specializations firstName lastName');
     const allowedDomains = [...(paralegal.practiceAreas || []), ...(paralegal.specializations || [])];

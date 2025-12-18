@@ -13,7 +13,6 @@ const trainingCommentRoutes = require("./routes/trainingCommentRoutes");
 
 
 
-
 const app = express();
 app.use(corsConfig);
 app.set('trust proxy', 1);
@@ -65,8 +64,6 @@ app.use("/api/ai", require('./routes/trainingAI'));
 app.use("/api/time-entries", require('./routes/timeEntryRoutes'));
 app.use("/api/billing", require('./routes/billingRoutes'));
 app.use("/api", require('./routes/paymentRoutes'));
-
-
 
 
 
