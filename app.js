@@ -44,6 +44,9 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.use("/api/admin", require('./routes/adminRoutes'));
+app.use("/api/admin/assign", require('./routes/adminAssignmentRoutes'));
+app.use("/api/admin/tasks", require('./routes/adminTaskRoutes'));
 // ✅ 6. Main API routes
 app.use("/api/home", require('./routes/publicRequestRoutes.routes'));
 app.use('/api/dashboard', require('./routes/paralegaldash.routes'));
@@ -55,7 +58,6 @@ app.use('/api/notifications', require('./routes/notificationsRoutes'));
 app.use('/api/training', require('./routes/trainingRoutes'));
 // Routes
 app.use('/api/chat', chatRoutes);
-app.use('/api', meetingRoutes);
 
 
 app.use("/api/training/progress", trainingProgressRoutes);
@@ -64,6 +66,7 @@ app.use("/api/ai", require('./routes/trainingAI'));
 app.use("/api/time-entries", require('./routes/timeEntryRoutes'));
 app.use("/api/billing", require('./routes/billingRoutes'));
 app.use("/api", require('./routes/paymentRoutes'));
+app.use('/api', meetingRoutes);
 
 
 

@@ -8,6 +8,7 @@ const { uploadFilesToS3 } = require('../config/s3'); // New Import
 const { PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const {s3} = require('../config/s3');
+const Admin = require('../models/Admin');
 
 // @desc    Get all tasks with filters
 // @route   GET /api/tasks
@@ -201,46 +202,28 @@ exports.createTask = async (req, res) => {
       console.error('❌ Failed to create attorney notification:', notifError.message);
     }
 
-    // 3. Notify Paralegals
-    const allParalegals = await Paralegal.find({}).select('_id firstName lastName email');
-    
-    if (allParalegals.length > 0) {
-      // In-App Notifications
-      try {
-        const paralegalNotifications = allParalegals.map(paralegal => ({
-          recipient: paralegal._id,
-          recipientModel: 'Paralegal',
-          type: 'task_created',
-          task: task._id,
-          message: `New task available: "${title}" - ${priority || 'Medium'} priority`
-        }));
-        await Notification.insertMany(paralegalNotifications);
-      } catch (notifError) {
-        console.error('❌ Failed to create paralegal notifications:', notifError.message);
+ 
+  // 4. NOTIFICATIONS LOGIC (Multiple Admins)
+    try {
+      // Find all active admins
+      const admins = await Admin.find({ isActive: true }).select('_id');
+      
+      const adminNotifications = admins.map(admin => ({
+        recipient: admin._id,
+        recipientModel: 'Admin',
+        type: 'task_created',
+        task: task._id,
+        message: `New task "${title}" created by ${req.user.fullName}.`
+      }));
+
+      // Bulk create notifications for all admins
+      if (adminNotifications.length > 0) {
+        await Notification.insertMany(adminNotifications);
       }
 
-      // Emails
-      const paralegalEmailData = {
-        _id: task._id,
-        title,
-        description,
-        type,
-        priority: priority || 'Medium',
-        dueDate,
-        estimatedHours,
-        assignedByName: `${req.user.fullName}`
-      };
-
-      // Simple loop for emails (can be optimized with batches)
-      // allParalegals.forEach(async (p) => {
-      //   try {
-      //     await sendBrevoEmailApi({
-      //       to_email: [{ email: p.email, name: `${p.firstName} ${p.lastName}` }],
-      //       email_subject: '🔔 New Task Available - Juris-LPO',
-      //       htmlContent: paralegalTaskAvailableTemplate(`${p.firstName} ${p.lastName}`, paralegalEmailData)
-      //     });
-      //   } catch (e) { console.error(`Failed email to ${p.email}`); }
-      // });
+      // Optional: Email logic remains same...
+    } catch (notifError) {
+      console.error('Notification Error:', notifError.message);
     }
 
     res.status(201).json({

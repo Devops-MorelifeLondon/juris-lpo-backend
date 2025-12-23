@@ -102,8 +102,8 @@ exports.getDashboardStats = async (req, res) => {
 exports.getAssignedTasks = async (req, res) => {
   try {
     const paralegalId = req.user._id;
-    const { limit = 5, status, priority } = req.query;
-    const limitNum = parseInt(limit) || 5;
+    const { limit = 10, status, priority } = req.query;
+    const limitNum = parseInt(limit) || 10;
 
     // Build filters for assigned tasks
     const baseFilter = { assignedTo: paralegalId };
@@ -123,6 +123,7 @@ exports.getAssignedTasks = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(limitNum)
       .lean();
+      console.log(tasks.map(t => t.assignedBy.fullName))
 
     // Format for frontend
     const formattedTasks = tasks.map(task => ({
@@ -145,7 +146,7 @@ exports.getAssignedTasks = async (req, res) => {
         firstName: task.assignedBy.firstName,
         lastName: task.assignedBy.lastName,
         email: task.assignedBy.email,
-        fullName: `${task.assignedBy.firstName} ${task.assignedBy.lastName}`
+        fullName: task.assignedBy.fullName
       } : null,
       case: task.case ? {
         id: task.case._id.toString(),
