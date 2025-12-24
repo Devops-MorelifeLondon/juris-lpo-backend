@@ -206,7 +206,9 @@ exports.createTask = async (req, res) => {
   // 4. NOTIFICATIONS LOGIC (Multiple Admins)
     try {
       // Find all active admins
-      const admins = await Admin.find({ isActive: true }).select('_id');
+     const admins = await Admin.find({ isActive: true })
+  .select('_id fullName email');
+
       
       const adminNotifications = admins.map(admin => ({
         recipient: admin._id,
