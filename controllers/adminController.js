@@ -2,6 +2,9 @@ const Admin = require('../models/Admin');
 const jwt = require('jsonwebtoken');
 const Task = require('../models/Task');
 const Paralegal = require('../models/Paralegal');
+// controllers/adminController.js
+const crypto = require('crypto');
+const { sendBrevoEmailApi } = require('../lib/emailBrevoSdk');
 
 // ✅ Updated Helper: Now accepts and encodes the role
 const signToken = (id, role) => {
@@ -163,6 +166,67 @@ exports.getDashboardStats = async (req, res) => {
         completed: completedTasks
       }
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const admin = await Admin.findOne({ email });
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: 'No admin found with that email address.' });
+    }
+
+    // 1. Generate reset token
+    const resetToken = admin.createPasswordResetToken();
+    await admin.save({ validateBeforeSave: false });
+
+    // 2. Send it via Brevo
+    const resetURL = `${process.env.ADMIN_FRONTEND_URL}/reset-password/${resetToken}`;
+
+    const htmlContent = `
+      <h1>Password Reset Request</h1>
+      <p>You requested a password reset. Please click the link below to reset your password. This link is valid for 1 hour.</p>
+      <a href="${resetURL}" style="background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; rounded: 5px;">Reset Password</a>
+      <p>If you didn't request this, please ignore this email.</p>
+    `;
+
+    await sendBrevoEmailApi({
+      to_email: { email: admin.email, name: admin.fullName },
+      email_subject: 'Admin Password Reset (Valid for 1 hour)',
+      htmlContent
+    });
+
+    res.status(200).json({ success: true, message: 'Token sent to email!' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    // 1. Get admin based on hashed token
+    const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+
+    const admin = await Admin.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: Date.now() }
+    });
+
+    if (!admin) {
+      return res.status(400).json({ success: false, message: 'Token is invalid or has expired.' });
+    }
+
+    // 2. Update password and clear reset fields
+    admin.password = req.body.password;
+    admin.passwordResetToken = undefined;
+    admin.passwordResetExpires = undefined;
+    await admin.save();
+
+    res.status(200).json({ success: true, message: 'Password reset successful!' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

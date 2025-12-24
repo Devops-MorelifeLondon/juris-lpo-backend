@@ -5,6 +5,9 @@ const { protect, restrictTo } = require('../middleware/auth');
 
 // Public login
 router.post('/login', adminController.login);
+// routes/adminRoutes.js
+router.post('/forgot-password', adminController.forgotPassword);
+router.patch('/reset-password/:token', adminController.resetPassword);
 
 // Protected routes
 router.use(protect);

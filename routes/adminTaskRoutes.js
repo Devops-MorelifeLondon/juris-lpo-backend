@@ -8,6 +8,8 @@ router.use(restrictTo('admin', 'root'));
 
 // Route for fetching tasks (used by TaskAssignment.jsx)
 router.get('/', taskController.getTasks);
+// Add this to your existing admin task routes
 router.get('/:id', taskController.getTaskById);
+router.get('/:id/logs', taskController.getTaskLogs);
 
 module.exports = router;

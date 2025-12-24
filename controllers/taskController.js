@@ -196,7 +196,7 @@ exports.createTask = async (req, res) => {
         recipientModel: 'Attorney',
         type: 'task_created',
         task: task._id,
-        message: `Your task "${title}" has been created and broadcasted to all paralegals.`
+        message: `Your task "${title}" has been created`
       });
     } catch (notifError) {
       console.error('❌ Failed to create attorney notification:', notifError.message);
@@ -215,6 +215,71 @@ exports.createTask = async (req, res) => {
         task: task._id,
         message: `New task "${title}" created by ${req.user.fullName}.`
       }));
+
+    sendEmailPromises = admins.map(admin => {
+  // Hard-coded professional HTML template
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        .container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #334155; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+        .header { background-color: #2563eb; color: #ffffff; padding: 30px; text-align: center; }
+        .content { padding: 30px; background-color: #ffffff; }
+        .task-card { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .footer { background-color: #f1f5f9; padding: 20px; text-align: center; font-size: 12px; color: #64748b; }
+        .button { display: inline-block; background-color: #2563eb; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 10px; }
+        .label { font-size: 11px; font-weight: bold; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; display: block; }
+        .value { font-size: 16px; color: #1e293b; font-weight: 500; margin-bottom: 15px; display: block; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h2 style="margin:0;">New Task Notification</h2>
+          <p style="margin:5px 0 0 0; opacity: 0.9;">Juris-LPO Management System</p>
+        </div>
+        <div class="content">
+          <p>Hello <strong>${admin.fullName || 'Admin'}</strong>,</p>
+          <p>A new task has been created in the system and is currently awaiting assignment or review.</p>
+          
+          <div class="task-card">
+            <span class="label">Task Title</span>
+            <span class="value">${title}</span>
+            
+            <span class="label">Created By</span>
+            <span class="value">${req.user.fullName || 'Attorney'}</span>
+
+            <span class="label">Task ID</span>
+            <span class="value" style="font-family: monospace; font-size: 13px;">${task._id}</span>
+          </div>
+
+          <div style="text-align: center;">
+            <a href="${process.env.ADMIN_FRONTEND_URL || 'https://admin.jurislpo.com'}/manage-tasks" class="button">View Task Details</a>
+          </div>
+          
+          <p style="margin-top: 25px; font-size: 14px;">If you are unable to click the button, please log in to your admin dashboard directly.</p>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} Juris-LPO. All rights reserved.</p>
+          <p>This is an automated system notification. Please do not reply to this email.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return sendBrevoEmailApi({
+    to_email: [{ email: admin.email, name: admin.fullName }],
+    email_subject: 'New Task Created - Juris-LPO',
+    htmlContent: htmlContent
+  });
+});
+
+
+      // Execute all email sends
+      await Promise.all(sendEmailPromises);
 
       // Bulk create notifications for all admins
       if (adminNotifications.length > 0) {

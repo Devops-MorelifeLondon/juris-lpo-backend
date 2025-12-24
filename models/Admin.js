@@ -29,7 +29,9 @@ const adminSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  lastLogin: Date
+  lastLogin: Date,
+  passwordResetToken: String,
+  passwordResetExpires: Date
 }, {
   timestamps: true
 });
@@ -44,6 +46,22 @@ adminSchema.pre('save', async function(next) {
 // Compare password
 adminSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Add a method to generate the reset token
+adminSchema.methods.createPasswordResetToken = function() {
+  const resetToken = require('crypto').randomBytes(32).toString('hex');
+
+  // Hash the token and save to database (security best practice)
+  this.passwordResetToken = require('crypto')
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+
+  // Token valid for 1 hour
+  this.passwordResetExpires = Date.now() + 3600000;
+
+  return resetToken;
 };
 
 module.exports = mongoose.model('Admin', adminSchema);
