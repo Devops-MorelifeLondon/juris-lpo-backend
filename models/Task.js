@@ -16,6 +16,21 @@ const taskSchema = new mongoose.Schema({
     ref: 'Case',
     required: false
   },
+  documentCategory: {
+    type: String,
+    enum: [
+      'Samples of previously delivered work',
+      'Reference documents',
+      'Formats/templates to be followed',
+      'Specific SOPs or instructions',
+      'Other'
+    ],
+    default: 'Reference documents'
+  },
+  customDocumentCategory: {
+    type: String,
+    required: false
+  },
   assignedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Attorney', // or User

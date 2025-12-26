@@ -14,6 +14,7 @@ const {
 const { sendBrevoEmailApi } = require("../lib/emailBrevoSdk");
 
 const TEAM_EMAIL = "contact@jurislpo.com";
+// const TEAM_EMAIL = "nomannaeem985@gmail.com";
 
 const validate = (arr) => arr.every((v) => v && v.trim() !== "");
 

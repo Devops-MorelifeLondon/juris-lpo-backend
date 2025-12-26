@@ -110,7 +110,10 @@ exports.createTask = async (req, res) => {
       checklistItems,
       notes,
       domain,
-      tags
+      tags,
+      case: caseId, // Linked case ID
+      documentCategory,
+      customDocumentCategory,
     } = req.body;
 
     if (!title || !description || !type || !dueDate) {
@@ -152,6 +155,9 @@ exports.createTask = async (req, res) => {
       description,
       assignedBy: req.user._id,
       type,
+      case: caseId || null,
+      documentCategory,
+      customDocumentCategory: documentCategory === 'Other' ? customDocumentCategory : undefined,
       priority: priority || 'Medium',
       dueDate: new Date(dueDate),
       estimatedHours: estimatedHours ? Number(estimatedHours) : undefined,

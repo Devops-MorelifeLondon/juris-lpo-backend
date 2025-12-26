@@ -7,7 +7,7 @@ const PublicRequestSchema = new mongoose.Schema(
     // 🔹 Type of request
     requestType: {
       type: String,
-      enum: ["profile", "recentWork", "interview", "customRequirement"],
+      enum: ["profile", "recentWork", "interview", "customRequirement", "consultation"],
       required: true,
     },
 

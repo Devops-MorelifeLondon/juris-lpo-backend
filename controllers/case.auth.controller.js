@@ -32,6 +32,7 @@ exports.createCase = async (req, res) => {
       deadline,
       budget,
       agreedHourlyRate,
+      estimatedHours,
       actualHoursSpent,
       totalCost,
       notes,
@@ -77,6 +78,7 @@ exports.createCase = async (req, res) => {
       deadline: deadline || null,
       budget: Number(budget) || 0,
       agreedHourlyRate: Number(agreedHourlyRate) || 0,
+      estimatedHours: Number(estimatedHours) || 0,
       actualHoursSpent: Number(actualHoursSpent) || 0,
       totalCost: Number(totalCost) || 0,
       assignmentDetails: {
@@ -241,19 +243,28 @@ exports.updateCase = async (req, res) => {
     if (!caseData)
       return res.status(404).json({ success: false, message: 'Case not found' });
 
-    if (caseData.attorney.toString() !== userId)
-      return res.status(403).json({ success: false, message: 'You do not have permission to update this case' });
+   
+
+   if (!caseData.attorney.equals(userId)) {
+  return res.status(403).json({
+    success: false,
+    message: 'You do not have permission to update this case'
+  });
+}
+
 
     const allowedUpdates = [
       'name',
       'caseNumber',
       'client',
       'serviceType',
+      'otherServiceTypeDescription',
       'status',
       'priority',
       'deadline',
       'budget',
       'agreedHourlyRate',
+      'estimatedHours',
       'actualHoursSpent',
       'totalCost',
       'notes',
@@ -273,11 +284,15 @@ exports.updateCase = async (req, res) => {
       };
     }
 
-    ['budget', 'agreedHourlyRate', 'actualHoursSpent', 'totalCost'].forEach((numField) => {
-      if (updates[numField]) updates[numField] = Number(updates[numField]);
+    ['budget', 'agreedHourlyRate', 'estimatedHours', 'actualHoursSpent', 'totalCost'].forEach((numField) => {
+      if (updates[numField] !== undefined) updates[numField] = Number(updates[numField]);
     });
 
-    const updatedCase = await Case.findByIdAndUpdate(caseId, { $set: updates }, { new: true, runValidators: true })
+    const updatedCase = await Case.findByIdAndUpdate(
+      caseId, 
+      { $set: updates }, 
+      { new: true, runValidators: true }
+    )
       .populate('attorney', 'fullName email firmName')
       .populate('paralegal', 'fullName email');
 
