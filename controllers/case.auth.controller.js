@@ -1,6 +1,7 @@
 const Case = require('../models/Case');
 const Attorney = require('../models/Attorney');
 const Paralegal = require('../models/Paralegal');
+const Task = require('../models/Task'); // Add Task model
 const jwt = require('jsonwebtoken');
 const { sendBrevoEmailApi } = require('../lib/emailBrevoSdk');
 const emailTemplates = require('../lib/emailTemplates');
@@ -169,6 +170,30 @@ exports.getMyCases = async (req, res) => {
       .limit(Number(limit))
       .lean();
 
+      const caseIds = cases.map(c => c._id);
+const tasks = await Task.find({
+  case: { $in: caseIds },
+  isArchived: false
+})
+  .populate('assignedTo', 'fullName firstName lastName email')
+  .populate('assignedBy', 'fullName email')
+  .sort({ priority: -1, dueDate: 1, createdAt: -1 })
+  .lean();
+
+
+     const taskMap = {};
+
+tasks.forEach(task => {
+  const caseId = task.case.toString();
+  if (!taskMap[caseId]) taskMap[caseId] = [];
+  taskMap[caseId].push(task);
+});
+const casesWithTasks = cases.map(c => ({
+  ...c,
+  tasks: taskMap[c._id.toString()] || [],
+}));
+
+
     const total = await Case.countDocuments(query);
 
     res.status(200).json({
@@ -177,7 +202,7 @@ exports.getMyCases = async (req, res) => {
       total,
       totalPages: Math.ceil(total / limit),
       currentPage: Number(page),
-      data: cases,
+       data: casesWithTasks,
     });
   } catch (error) {
     console.error('💥 Get cases error:', error);
@@ -189,7 +214,7 @@ exports.getMyCases = async (req, res) => {
   }
 };
 
-// @desc    Get single case details
+// @desc    Get single case details WITH TASKS
 // @route   GET /api/cases/:caseId
 // @access  Private
 exports.getCaseById = async (req, res) => {
@@ -208,14 +233,31 @@ exports.getCaseById = async (req, res) => {
     if (!caseData)
       return res.status(404).json({ success: false, message: 'Case not found' });
 
-    const hasAccess =
-      (userRole === 'attorney' && caseData.attorney?._id?.toString() === userId) ||
-      (userRole === 'paralegal' && caseData.paralegal?._id?.toString() === userId);
+    console.log(caseData.attorney._id);
+    console.log(userId);
+
+   const hasAccess =
+  (userRole === 'attorney' && caseData.attorney?._id?.equals(userId)) ||
+  (userRole === 'paralegal' && caseData.paralegal?._id?.equals(userId));
+
 
     if (!hasAccess)
       return res.status(403).json({ success: false, message: 'You do not have access to this case' });
 
-    res.status(200).json({ success: true, data: caseData });
+    // FETCH LINKED TASKS
+    const tasks = await Task.find({ case: caseId, isArchived: false })
+      .populate('assignedTo', 'fullName firstName lastName email')
+      .populate('assignedBy', 'fullName email')
+      .sort({ priority: -1, dueDate: 1, createdAt: -1 })
+      .lean();
+
+    // Add tasks to response
+    const response = {
+      ...caseData,
+      tasks: tasks || []
+    };
+
+    res.status(200).json({ success: true, data: response });
   } catch (error) {
     console.error('💥 Get case by ID error:', error);
     res.status(500).json({
@@ -243,15 +285,12 @@ exports.updateCase = async (req, res) => {
     if (!caseData)
       return res.status(404).json({ success: false, message: 'Case not found' });
 
-   
-
-   if (!caseData.attorney.equals(userId)) {
-  return res.status(403).json({
-    success: false,
-    message: 'You do not have permission to update this case'
-  });
-}
-
+    if (!caseData.attorney.equals(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to update this case'
+      });
+    }
 
     const allowedUpdates = [
       'name',
@@ -310,7 +349,6 @@ exports.updateCase = async (req, res) => {
     });
   }
 };
-
 
 // @desc    Update case status (Attorney or Paralegal)
 // @route   PATCH /api/cases/:caseId/status
