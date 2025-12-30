@@ -113,6 +113,14 @@ const trainingDocumentSchema = new mongoose.Schema(
       enum: ['AI Draft', 'Paralegal Template', 'SOP', 'Research Material', 'Other'],
     },
 
+    // 🔥 NEW: Template Type (only for Paralegal Template)
+    templateType: {
+      type: String,
+      required: function() {
+        return this.documentType === 'Paralegal Template';
+      }
+    },
+
     assignedTo: {
       type: String,
       required: true,

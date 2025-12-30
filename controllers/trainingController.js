@@ -28,9 +28,7 @@ exports.generateFileUploadUrl = async (req, res) => {
 exports.generateVideoUploadUrl = async (req, res) => {
   try {
     const { fileName, fileType, fileSize } = req.body;
-    if (fileSize && fileSize > 1100 * 1024 * 1024) {
-      return res.status(400).json({ success: false, message: "Max video size allowed is 1100MB" });
-    }
+ 
     const key = `training/videos/${Date.now()}-${fileName}`;
     const command = new PutObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
@@ -50,6 +48,7 @@ exports.saveMetadata = async (req, res) => {
     const {
       documentName,
       documentType,
+      templateType,
       assignedTo,
       priority,
       description,
@@ -80,6 +79,7 @@ exports.saveMetadata = async (req, res) => {
     const newDoc = new TrainingDocument({
       documentName,
       documentType,
+      templateType: documentType === "Paralegal Template" ? templateType : undefined,
       assignedTo,
       priority,
       description,
@@ -89,7 +89,7 @@ exports.saveMetadata = async (req, res) => {
       uploadedBy: uploadedByName,
       uploadedById: req.user._id,
       uploadedByModel: role === "attorney" ? "Attorney" : "Paralegal",
-      status: "Uploaded",
+      status: "Pending Review",
     });
 
     await newDoc.save();
